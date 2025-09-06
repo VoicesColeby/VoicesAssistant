@@ -1,3 +1,5 @@
+import os
+import json
 import asyncio
 from typing import Optional
 
@@ -66,6 +68,10 @@ async def select_job_in_modal(modal, job_id: str) -> bool:
         # Verify chip reflects the choice
         chip_txt = await modal.locator('.choices__list--single .choices__item').first.inner_text()
         if f"#{job_id}" in (chip_txt or ""):
+            try:
+                log_event({"type": "job_select", "method": "hidden_select", "job_id": str(job_id)})
+            except Exception:
+                pass
             return True
     except Exception:
         pass
@@ -103,6 +109,10 @@ async def select_job_in_modal(modal, job_id: str) -> bool:
             if await opt.count():
                 await opt.scroll_into_view_if_needed()
                 await opt.click()
+                try:
+                    log_event({"type": "job_select", "method": "choices_click", "job_id": str(job_id)})
+                except Exception:
+                    pass
                 return True
         except Exception:
             pass
@@ -151,9 +161,40 @@ async def confirm_invite(modal) -> bool:
     # Wait for the modal to close (success or already invited toast may appear)
     try:
         await modal.wait_for(state="hidden", timeout=6000)
+        try:
+            log_event({"type": "confirm", "status": "modal_hidden"})
+        except Exception:
+            pass
         return True
     except Exception:
+        try:
+            log_event({"type": "confirm", "status": "timeout"})
+        except Exception:
+            pass
         return False
+
+
+def log_event(evt: dict):
+    try:
+        evt = dict(evt)
+        print("[invite_simple] " + json.dumps(evt))
+        lf = os.environ.get("VOICES_LOG_FILE", "").strip()
+        if lf:
+            with open(lf, "a", encoding="utf-8") as f:
+                f.write(json.dumps(evt) + "\n")
+    except Exception:
+        pass
+
+
+async def accept_cookies(page) -> None:
+    try:
+        btn = page.locator(":is(button,a,[role='button']):has-text('Accept'), :is(button,a,[role='button']):has-text('I agree'), :is(button,a,[role='button']):has-text('Got it')").first
+        if await btn.count():
+            await btn.click()
+            await asyncio.sleep(0.2)
+            log_event({"type": "cookies", "action": "accepted"})
+    except Exception:
+        pass
 
 
 async def run(job_id: str = DEFAULT_JOB_ID, start_url: str = SEARCH_URL, headless: bool = False, slow_mo: int = 60):
@@ -162,12 +203,34 @@ async def run(job_id: str = DEFAULT_JOB_ID, start_url: str = SEARCH_URL, headles
         context = await browser.new_context(storage_state="voices_auth_state.json")
         page = await context.new_page()
 
-        await page.goto(start_url)
-        # Give time for manual login if required; wait until card-level invite buttons are visible
+        log_event({"type": "start", "url": start_url, "job_id": str(job_id)})
+
         try:
-            await page.wait_for_selector(":is(button,[role='button'],a):has-text('Invite to Job')", timeout=120000)
-        except PWTimeout:
-            print("Timeout waiting for invite buttons. Ensure you are logged in.")
+            await page.goto(start_url)
+            await page.wait_for_load_state("domcontentloaded")
+        except Exception:
+            pass
+        await accept_cookies(page)
+
+        # Initial wait for Invite buttons to allow manual login and content load
+        found = False
+        for attempt in range(120):  # up to ~120 seconds
+            try:
+                cards = page.locator("article:has(button:has-text('Invite to Job')), [data-testid='talent-card'], [data-qa='talent-card']")
+                count = await cards.count()
+                log_event({"type": "wait_buttons", "attempt": attempt+1, "count": int(count)})
+                if count > 0:
+                    found = True
+                    break
+                # small scroll pulse to trigger lazy load
+                await page.mouse.wheel(0, 800)
+                await asyncio.sleep(1.0)
+            except Exception:
+                await asyncio.sleep(1.0)
+        if not found:
+            log_event({"type": "exit", "reason": "no_buttons"})
+            await context.close()
+            await browser.close()
             return
 
         # Process invites by re-computing buttons each loop (buttons may change after invites)
@@ -178,13 +241,17 @@ async def run(job_id: str = DEFAULT_JOB_ID, start_url: str = SEARCH_URL, headles
                 count = await cards.count()
                 if idx >= count:
                     break
+                log_event({"type": "invite_open", "idx": int(idx), "count": int(count)})
                 modal = await open_existing_job_modal(page, idx)
                 if not modal:
+                    log_event({"type": "invite_open_failed", "idx": int(idx)})
                     idx += 1
                     continue
                 await asyncio.sleep(0.2)
-                await select_job_in_modal(modal, job_id)
-                await confirm_invite(modal)
+                ok_sel = await select_job_in_modal(modal, job_id)
+                log_event({"type": "invite_select", "idx": int(idx), "selected": bool(ok_sel), "job_id": str(job_id)})
+                ok_conf = await confirm_invite(modal)
+                log_event({"type": "invite_confirm", "idx": int(idx), "confirmed": bool(ok_conf)})
                 await asyncio.sleep(0.5)
             except Exception:
                 pass
