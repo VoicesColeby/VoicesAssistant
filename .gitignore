@@ -1,0 +1,27 @@
+﻿# Byte-compiled / cache
+__pycache__/
+*.py[cod]
+
+# Local state and logs
+invites_log.jsonl
+voices_auth_state.json
+voices_invite_checkpoint.json
+*.log
+*.db*
+
+# Playwright/Profiles
+playwright-profile/
+profiles/
+
+# Patches and temp
+patch*.diff
+invite_all.py.tmp
+"New Text Document.txt"
+CON
+
+# System files
+.DS_Store
+Thumbs.db
+
+# Node/npm if any
+node_modules/
