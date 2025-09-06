@@ -329,41 +329,19 @@ class App(tk.Tk):
             if self.var_headless.get():
                 args.append("--headless")
 
-        else:  # Invite to Job (default)
-            args = [python, str(self.script_path)]
-            # CDP options
-            if self.var_attach_cdp.get():
-                if self.var_require_cdp.get():
-                    args.append("--require-cdp")
-                env["CHROME_CDP_URL"] = (self.var_cdp_url.get().strip() or DEFAULT_CDP_URL)
-            else:
-                args.append("--no-cdp")
-            if self.var_manual_login.get():
-                args.append("--manual-login")
-            # Speed
-            if self.var_fast.get():
-                args.append("--fast")
-            else:
-                args.extend(["--slow-mo", str(int(self.var_slow_mo.get()))])
-            if self.var_scroll_passes.get() >= 0:
-                args.extend(["--scroll-passes", str(int(self.var_scroll_passes.get()))])
+        else:  # Invite to Job (default) -> use invite_simple.py
+            script = Path(__file__).parent / "invite_simple.py"
+            args = [python, str(script)]
             # Filters
             job_id_str = self.var_job_id.get().strip()
-            job_title_str = self.var_job_title.get().strip()
             if job_id_str:
                 args.extend(["--job-id", job_id_str])
-            if job_title_str:
-                args.extend(["--job-title", job_title_str])
-            if self.var_headless.get():
-                args.append("--headless")
-            if self.var_dry_run.get():
-                args.append("--dry-run")
-            if log_path:
-                args.extend(["--log-file", log_path])
-            if invited_db:
-                args.extend(["--invited-db", invited_db])
             if start_url:
                 args.extend(["--start-url", start_url])
+            # Speed
+            args.extend(["--slow-mo", str(int(self.var_slow_mo.get()))])
+            if self.var_headless.get():
+                args.append("--headless")
 
         try:
             self.proc.start(args=args, cwd=self.script_path.parent, env=env)
