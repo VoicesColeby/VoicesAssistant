@@ -105,6 +105,7 @@ class App(tk.Tk):
         self.settings_path = Path(__file__).parent / DEFAULT_SETTINGS_FILE
 
         # Variables
+        self.var_mode = tk.StringVar(value="Invite to Job")
         self.var_start_url = tk.StringVar(value=DEFAULT_START_URL)
         self.var_cdp_url = tk.StringVar(value=DEFAULT_CDP_URL)
         self.var_attach_cdp = tk.BooleanVar(value=True)
@@ -121,6 +122,7 @@ class App(tk.Tk):
         self.var_invited_db = tk.StringVar(value=str(Path.cwd() / "invited_ids.json"))
         self.var_job_id = tk.StringVar(value="")
         self.var_job_title = tk.StringVar(value="")
+        self.var_message_text = tk.StringVar(value="can you please complete this survey for your rate")
         # Removed: 'No job filter' (we always require a job id/title now)
 
         # Favorites mode
@@ -148,140 +150,50 @@ class App(tk.Tk):
         frm = ttk.Frame(self)
         frm.pack(fill=tk.BOTH, expand=True)
 
-        # Row 0: Start URL
-        ttk.Label(frm, text="Start URL:").grid(row=0, column=0, sticky="e", **pad)
-        ttk.Entry(frm, textvariable=self.var_start_url, width=100).grid(row=0, column=1, columnspan=5, sticky="we", **pad)
-
-        # Row 1: CDP / Attach / Manual login
-        ttk.Label(frm, text="CDP URL:").grid(row=1, column=0, sticky="e", **pad)
-        ttk.Entry(frm, textvariable=self.var_cdp_url, width=36).grid(row=1, column=1, sticky="w", **pad)
-        ttk.Checkbutton(frm, text="Attach to running Chrome", variable=self.var_attach_cdp).grid(row=1, column=2, sticky="w", **pad)
-        ttk.Checkbutton(frm, text="Require CDP", variable=self.var_require_cdp).grid(row=1, column=3, sticky="w", **pad)
-        ttk.Checkbutton(frm, text="Manual login", variable=self.var_manual_login).grid(row=1, column=4, sticky="w", **pad)
-        ttk.Checkbutton(frm, text="Headless", variable=self.var_headless).grid(row=1, column=5, sticky="w", **pad)
-        ttk.Button(frm, text="Test CDP", command=self.test_cdp).grid(row=1, column=6, sticky="w", **pad)
-
-        # Row 2: Speed / Scroll / Debug
-        ttk.Checkbutton(frm, text="Fast mode", variable=self.var_fast).grid(row=2, column=0, sticky="w", **pad)
-        ttk.Label(frm, text="Slow-mo (ms):").grid(row=2, column=1, sticky="e", **pad)
-        ttk.Spinbox(frm, from_=0, to=1000, increment=10, textvariable=self.var_slow_mo, width=8).grid(row=2, column=2, sticky="w", **pad)
-        ttk.Label(frm, text="Scroll passes:").grid(row=2, column=3, sticky="e", **pad)
-        ttk.Spinbox(frm, from_=0, to=10, increment=1, textvariable=self.var_scroll_passes, width=6).grid(row=2, column=4, sticky="w", **pad)
-        ttk.Checkbutton(frm, text="Debug logs", variable=self.var_debug).grid(row=2, column=5, sticky="w", **pad)
-        ttk.Checkbutton(frm, text="Dry-run", variable=self.var_dry_run).grid(row=2, column=6, sticky="w", **pad)
-
-        # Row 3: Job filtering / Favorites
-        ttk.Label(frm, text="Job ID:").grid(row=3, column=0, sticky="e", **pad)
-        ttk.Entry(frm, textvariable=self.var_job_id, width=18).grid(row=3, column=1, sticky="w", **pad)
-        ttk.Label(frm, text="Job Title contains:").grid(row=3, column=2, sticky="e", **pad)
-        ttk.Entry(frm, textvariable=self.var_job_title, width=26).grid(row=3, column=3, sticky="w", **pad)
-        ttk.Checkbutton(frm, text="Use Favorites (heart)", variable=self.var_use_favorites).grid(row=3, column=4, sticky="w", **pad)
-        ttk.Label(frm, text="Favorites list:").grid(row=3, column=5, sticky="e", **pad)
-        ttk.Entry(frm, textvariable=self.var_fav_list_title, width=20).grid(row=3, column=6, sticky="w", **pad)
-
-        # Row 4: Pause file
-        ttk.Label(frm, text="Pause file:").grid(row=4, column=0, sticky="e", **pad)
-        ttk.Entry(frm, textvariable=self.var_pause_file, width=60).grid(row=4, column=1, columnspan=4, sticky="we", **pad)
-        ttk.Button(frm, text="Browse…", command=self.choose_pause_file).grid(row=4, column=5, sticky="w", **pad)
-
-        # Row 5: Log file path
-        ttk.Label(frm, text="Log file:").grid(row=5, column=0, sticky="e", **pad)
-        ttk.Entry(frm, textvariable=self.var_log_file, width=60).grid(row=5, column=1, columnspan=4, sticky="we", **pad)
-        ttk.Button(frm, text="Browse...", command=self.choose_log_file).grid(row=5, column=5, sticky="w", **pad)
-
-        # Row 6: Invited DB path
-        ttk.Label(frm, text="Invited DB:").grid(row=6, column=0, sticky="e", **pad)
-        ttk.Entry(frm, textvariable=self.var_invited_db, width=46).grid(row=6, column=1, columnspan=3, sticky="we", **pad)
-        ttk.Button(frm, text="Browse...", command=self.choose_invited_db).grid(row=6, column=4, sticky="w", **pad)
-        ttk.Button(frm, text="Reset", command=self.reset_invited_db).grid(row=6, column=5, sticky="w", **pad)
-
-        # Row 7: Chrome settings
-        sep1 = ttk.Separator(frm)
-        sep1.grid(row=7, column=0, columnspan=6, sticky="we", padx=6, pady=(4, 6))
-        ttk.Label(frm, text="Chrome profile:").grid(row=8, column=0, sticky="e", **pad)
-        ttk.Entry(frm, textvariable=self.var_profile_dir, width=16).grid(row=8, column=1, sticky="w", **pad)
-        ttk.Checkbutton(frm, text="Use temp user-data-dir (separate instance)", variable=self.var_use_temp_profile).grid(row=8, column=2, columnspan=3, sticky="w", **pad)
-        ttk.Button(frm, text="Launch Chrome (debug)", command=self.launch_chrome).grid(row=8, column=5, sticky="e", **pad)
-
-        # Row 9: Credentials
-        sep2 = ttk.Separator(frm)
-        sep2.grid(row=9, column=0, columnspan=6, sticky="we", padx=6, pady=(4, 6))
-        ttk.Label(frm, text="VOICES_EMAIL:").grid(row=10, column=0, sticky="e", **pad)
-        ttk.Entry(frm, textvariable=self.var_email, width=28).grid(row=10, column=1, sticky="w", **pad)
-        ttk.Label(frm, text="VOICES_PASSWORD:").grid(row=10, column=2, sticky="e", **pad)
-        ttk.Entry(frm, textvariable=self.var_password, show="*", width=28).grid(row=10, column=3, sticky="w", **pad)
-        ttk.Button(frm, text="Open Log", command=self.open_log).grid(row=10, column=4, sticky="e", **pad)
-        ttk.Button(frm, text="Open Start URL", command=self.open_url).grid(row=10, column=5, sticky="e", **pad)
-
-        # Row 11: Actions (simplified)
-        sep3 = ttk.Separator(frm)
-        sep3.grid(row=11, column=0, columnspan=6, sticky="we", padx=6, pady=(4, 6))
-        ttk.Label(frm, text="Mode:").grid(row=12, column=0, sticky="e", **pad)
+        # Row 0: Mode selection
+        ttk.Label(frm, text="Mode:").grid(row=0, column=0, sticky="e", **pad)
         mode_cb = ttk.Combobox(frm, values=["Invite to Job", "Add to Favorites", "Message Responses"], state="readonly", width=24)
-        mode_cb.configure(textvariable=getattr(self, 'var_mode', tk.StringVar(value="Invite to Job")))
-        mode_cb.grid(row=12, column=1, sticky="w", **pad)
-        # Keep Job URL, Job ID, Speed settings on main
-        ttk.Label(frm, text="Job URL:").grid(row=13, column=0, sticky="e", **pad)
-        ttk.Entry(frm, textvariable=self.var_start_url, width=70).grid(row=13, column=1, columnspan=4, sticky="we", **pad)
-        ttk.Label(frm, text="Job ID:").grid(row=14, column=0, sticky="e", **pad)
-        ttk.Entry(frm, textvariable=self.var_job_id, width=20).grid(row=14, column=1, sticky="w", **pad)
-        ttk.Checkbutton(frm, text="Fast mode", variable=self.var_fast).grid(row=14, column=2, sticky="w", **pad)
-        ttk.Label(frm, text="Slow-mo (ms):").grid(row=14, column=3, sticky="e", **pad)
-        ttk.Spinbox(frm, from_=0, to=1000, increment=10, textvariable=self.var_slow_mo, width=8).grid(row=14, column=4, sticky="w", **pad)
+        mode_cb.configure(textvariable=self.var_mode)
+        mode_cb.grid(row=0, column=1, sticky="w", **pad)
 
-        # Run / Stop / Settings / Save
-        ttk.Button(frm, text="Run", command=self.run_inviter).grid(row=15, column=0, sticky="w", **pad)
-        ttk.Button(frm, text="Stop", command=self.stop_inviter).grid(row=15, column=1, sticky="w", **pad)
-        ttk.Button(frm, text="Settings…", command=self.open_settings_dialog).grid(row=15, column=2, sticky="w", **pad)
-        ttk.Button(frm, text="Save Settings", command=self.save_settings).grid(row=15, column=3, sticky="w", **pad)
-        ttk.Button(frm, text="Save Settings", command=self.save_settings).grid(row=12, column=2, sticky="w", **pad)
+        # Row 1: Job/Search URL
+        ttk.Label(frm, text="Job/Search URL:").grid(row=1, column=0, sticky="e", **pad)
+        ttk.Entry(frm, textvariable=self.var_start_url, width=90).grid(row=1, column=1, columnspan=4, sticky="we", **pad)
 
-        # Log area
+        # Row 2: Job ID and Speed
+        ttk.Label(frm, text="Job ID:").grid(row=2, column=0, sticky="e", **pad)
+        ttk.Entry(frm, textvariable=self.var_job_id, width=18).grid(row=2, column=1, sticky="w", **pad)
+        ttk.Checkbutton(frm, text="Fast mode", variable=self.var_fast).grid(row=2, column=2, sticky="w", **pad)
+        ttk.Label(frm, text="Slow-mo (ms):").grid(row=2, column=3, sticky="e", **pad)
+        ttk.Spinbox(frm, from_=0, to=1000, increment=10, textvariable=self.var_slow_mo, width=8).grid(row=2, column=4, sticky="w", **pad)
+
+        # Row 3: Message box
+        ttk.Label(frm, text="Message:").grid(row=3, column=0, sticky="ne", **pad)
+        self.msg_text = tk.Text(frm, height=4, width=90, wrap="word")
+        self.msg_text.grid(row=3, column=1, columnspan=4, sticky="we", **pad)
+        self.msg_text.insert("1.0", self.var_message_text.get())
+        def _sync_msg(*_):
+            self.var_message_text.set(self.msg_text.get("1.0", "end").strip())
+        self.msg_text.bind("<FocusOut>", lambda e: _sync_msg())
+
+        # Row 4: Actions
+        sep = ttk.Separator(frm)
+        sep.grid(row=4, column=0, columnspan=6, sticky="we", padx=6, pady=(4, 6))
+        ttk.Button(frm, text="Run", command=self.run_inviter).grid(row=5, column=0, sticky="w", **pad)
+        ttk.Button(frm, text="Stop", command=self.stop_inviter).grid(row=5, column=1, sticky="w", **pad)
+        ttk.Button(frm, text="Settings…", command=self.open_settings_dialog).grid(row=5, column=2, sticky="w", **pad)
+        ttk.Button(frm, text="Save Settings", command=self.save_settings).grid(row=5, column=3, sticky="w", **pad)
+        ttk.Button(frm, text="Open Log", command=self.open_log).grid(row=5, column=4, sticky="w", **pad)
+
+        # Row 6: Log area
         self.txt = tk.Text(frm, height=18, wrap="word")
-        self.txt.grid(row=16, column=0, columnspan=6, sticky="nsew", padx=6, pady=6)
+        self.txt.grid(row=6, column=0, columnspan=6, sticky="nsew", padx=6, pady=6)
         yscroll = ttk.Scrollbar(frm, orient="vertical", command=self.txt.yview)
-        yscroll.grid(row=16, column=6, sticky="ns")
+        yscroll.grid(row=6, column=6, sticky="ns")
         self.txt.configure(yscrollcommand=yscroll.set)
 
         frm.columnconfigure(1, weight=1)
-        frm.rowconfigure(16, weight=1)
-
-    def choose_pause_file(self):
-        p = filedialog.asksaveasfilename(title="Choose pause file path", initialfile="PAUSE")
-        if p:
-            self.var_pause_file.set(p)
-
-    def choose_log_file(self):
-        p = filedialog.asksaveasfilename(title="Choose log file path", initialfile="invites_log.jsonl")
-        if p:
-            self.var_log_file.set(p)
-
-    def choose_invited_db(self):
-        p = filedialog.asksaveasfilename(title="Choose invited DB file", initialfile="invited_ids.json")
-        if p:
-            self.var_invited_db.set(p)
-
-    def reset_invited_db(self):
-        try:
-            path = Path(self.var_invited_db.get().strip()) if self.var_invited_db.get().strip() else (Path.cwd() / "invited_ids.json")
-            if path.exists():
-                path.write_text("{}", encoding="utf-8")
-                self.append_log(f"[db] Reset invited DB at {path}\n")
-            else:
-                self.append_log(f"[db] No invited DB file to reset at {path}; creating.\n")
-                path.write_text("{}", encoding="utf-8")
-        except Exception as e:
-            messagebox.showerror("Reset Invited DB failed", str(e))
-
-    def parse_port_from_cdp(self) -> int:
-        try:
-            u = urlparse(self.var_cdp_url.get().strip())
-            if u.port:
-                return int(u.port)
-            # default 9222
-        except Exception:
-            pass
-        return 9222
+        frm.rowconfigure(6, weight=1)
 
     def open_url(self):
         url = self.var_start_url.get().strip()
@@ -371,17 +283,13 @@ class App(tk.Tk):
         # Build environment
         env = os.environ.copy()
         start_url = self.var_start_url.get().strip()
-        if start_url:
-            env["VOICES_START_URL"] = start_url
-        cdp_url = self.var_cdp_url.get().strip() or DEFAULT_CDP_URL
-        env["CHROME_CDP_URL"] = cdp_url
         if self.var_debug.get():
             env["VOICES_DEBUG"] = "1"
         else:
             env.pop("VOICES_DEBUG", None)
         if self.var_pause_file.get().strip():
             env["VOICES_PAUSE_FILE"] = self.var_pause_file.get().strip()
-        # Auto-enable structured logs when debugging or dry-run
+        # Structured logs / invited DB
         log_path = (self.var_log_file.get() or "").strip()
         if log_path:
             env["VOICES_LOG_FILE"] = log_path
@@ -395,59 +303,67 @@ class App(tk.Tk):
         if self.var_password.get().strip():
             env["VOICES_PASSWORD"] = self.var_password.get().strip()
 
-        # Build args
         python = sys.executable or "python"
-        args: list[str] = [python, str(self.script_path)]
+        mode = (getattr(self, 'var_mode', tk.StringVar(value='Invite to Job')).get() or "").strip()
 
-        if self.var_attach_cdp.get():
-            if self.var_require_cdp.get():
-                args.append("--require-cdp")
-        else:
-            args.append("--no-cdp")
-
-        if self.var_manual_login.get():
-            args.append("--manual-login")
-
-        if self.var_fast.get():
-            args.append("--fast")
-        else:
+        # Build args by mode
+        if mode == "Add to Favorites":
+            script = Path(__file__).parent / "favorites_add.py"
+            args = [python, str(script), "--url", start_url]
+            fav_title = (self.var_fav_list_title.get() or "").strip()
+            if fav_title:
+                args.extend(["--list", fav_title])
+            # Speed
             args.extend(["--slow-mo", str(int(self.var_slow_mo.get()))])
+            if self.var_headless.get():
+                args.append("--headless")
 
-        if self.var_scroll_passes.get() >= 0:
-            args.extend(["--scroll-passes", str(int(self.var_scroll_passes.get()))])
+        elif mode == "Message Responses":
+            script = Path(__file__).parent / "message_responses.py"
+            args = [python, str(script), "--url", start_url]
+            msg_text = (getattr(self, 'var_message_text', tk.StringVar(value='')).get() or "").strip()
+            if msg_text:
+                args.extend(["--text", msg_text])
+            # Speed
+            args.extend(["--slow-mo", str(int(self.var_slow_mo.get()))])
+            if self.var_headless.get():
+                args.append("--headless")
 
-        job_id_str = self.var_job_id.get().strip()
-        job_title_str = self.var_job_title.get().strip()
-        # Always pass job filters if provided
-        if job_id_str:
-            args.extend(["--job-id", job_id_str])
-        if job_title_str:
-            args.extend(["--job-title", job_title_str])
-
-        if self.var_headless.get():
-            args.append("--headless")
-
-        if self.var_dry_run.get():
-            args.append("--dry-run")
-
-        if log_path:
-            args.extend(["--log-file", log_path])
-        if invited_db:
-            args.extend(["--invited-db", invited_db])
-
-        # Favorites mode
-        if self.var_use_favorites.get():
-            args.append("--use-favorites")
-            env["VOICES_USE_FAVORITES"] = "1"
-        # Removed: prefer-create (we never create a new job via the modal)
-        fav_title = (self.var_fav_list_title.get() or "").strip()
-        if fav_title:
-            args.extend(["--favorites-list", fav_title])
-            env["VOICES_FAVORITES_LIST"] = fav_title
-
-        # Always pass the explicit start URL too for clarity
-        if start_url:
-            args.extend(["--start-url", start_url])
+        else:  # Invite to Job (default)
+            args = [python, str(self.script_path)]
+            # CDP options
+            if self.var_attach_cdp.get():
+                if self.var_require_cdp.get():
+                    args.append("--require-cdp")
+                env["CHROME_CDP_URL"] = (self.var_cdp_url.get().strip() or DEFAULT_CDP_URL)
+            else:
+                args.append("--no-cdp")
+            if self.var_manual_login.get():
+                args.append("--manual-login")
+            # Speed
+            if self.var_fast.get():
+                args.append("--fast")
+            else:
+                args.extend(["--slow-mo", str(int(self.var_slow_mo.get()))])
+            if self.var_scroll_passes.get() >= 0:
+                args.extend(["--scroll-passes", str(int(self.var_scroll_passes.get()))])
+            # Filters
+            job_id_str = self.var_job_id.get().strip()
+            job_title_str = self.var_job_title.get().strip()
+            if job_id_str:
+                args.extend(["--job-id", job_id_str])
+            if job_title_str:
+                args.extend(["--job-title", job_title_str])
+            if self.var_headless.get():
+                args.append("--headless")
+            if self.var_dry_run.get():
+                args.append("--dry-run")
+            if log_path:
+                args.extend(["--log-file", log_path])
+            if invited_db:
+                args.extend(["--invited-db", invited_db])
+            if start_url:
+                args.extend(["--start-url", start_url])
 
         try:
             self.proc.start(args=args, cwd=self.script_path.parent, env=env)
@@ -505,7 +421,7 @@ class App(tk.Tk):
         # Paths
         ttk.Label(dlg, text="Pause file:").grid(row=row, column=0, sticky="e", **pad)
         ttk.Entry(dlg, textvariable=self.var_pause_file, width=50).grid(row=row, column=1, columnspan=3, sticky="we", **pad)
-        ttk.Button(dlg, text="Browse…", command=self.choose_pause_file).grid(row=row, column=4, sticky="w", **pad)
+        ttk.Button(dlg, text="Browseâ€¦", command=self.choose_pause_file).grid(row=row, column=4, sticky="w", **pad)
         row += 1
 
         ttk.Label(dlg, text="Log file:").grid(row=row, column=0, sticky="e", **pad)
