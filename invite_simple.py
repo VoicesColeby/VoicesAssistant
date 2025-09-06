@@ -170,20 +170,26 @@ async def run(job_id: str = DEFAULT_JOB_ID, start_url: str = SEARCH_URL, headles
             print("Timeout waiting for invite buttons. Ensure you are logged in.")
             return
 
-        # Process invites linearly by card index to avoid re-clicking the same talent
-        cards = page.locator("article:has(button:has-text('Invite to Job')), [data-testid='talent-card'], [data-qa='talent-card']")
-        total = await cards.count()
-        for idx in range(total):
+        # Process invites by re-computing buttons each loop (buttons may change after invites)
+        idx = 0
+        while True:
             try:
+                cards = page.locator("article:has(button:has-text('Invite to Job')), [data-testid='talent-card'], [data-qa='talent-card']")
+                count = await cards.count()
+                if idx >= count:
+                    break
                 modal = await open_existing_job_modal(page, idx)
                 if not modal:
+                    idx += 1
                     continue
                 await asyncio.sleep(0.2)
                 await select_job_in_modal(modal, job_id)
                 await confirm_invite(modal)
                 await asyncio.sleep(0.5)
             except Exception:
-                continue
+                pass
+            finally:
+                idx += 1
 
         await context.close()
         await browser.close()
