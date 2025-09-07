@@ -1,0 +1,38 @@
+https://www.voices.com/talents/search?keywords=&accent_id=16&language_ids=388
+.
+
+pip install playwright
+playwright install
+START_URL= "https://www.voices.com/talents/search?keywords=&accent_id=16&language_ids=388" JOB_QUERY="805775" python invite_to_job_cdp.py
+
+
+$env:START_URL="https://www.voices.com/talents/search?keywords=&accent_id=16&language_ids=388"
+$env:JOB_QUERY="805775"
+python invite_to_job_cdp.py
+
+
+
+$env:START_URL="https://www.voices.com/talents/search?keywords=&accent_id=16&language_ids=388"
+$env:JOB_QUERY="818314"
+$env:DEBUG_URL="http://127.0.0.1:9222"   # <-- IPv4 instead of localhost
+python invite_to_job_cdp.py
+
+
+& "C:\Program Files\Google\Chrome\Application\chrome.exe" --remote-debugging-address=127.0.0.1 --remote-debugging-port=9222 --user-data-dir="C:\temp\cdp"
+$env:START_URL="https://www.voices.com/talents/search?keywords=&accent_id=16&language_ids=388"
+$env:JOB_QUERY="#818314"   # or a distinctive job title substring
+$env:DEBUG_URL="http://127.0.0.1:9222"
+python invite_to_job_cdp_human.py
+
+
+
+
+
+
+& "C:\Program Files\Google\Chrome\Application\chrome.exe" --remote-debugging-address=127.0.0.1 --remote-debugging-port=9222 --user-data-dir="C:\temp\cdp"
+
+$env:START_URL= "https://www.voices.com/talents/search?keywords=&accent_id=16&language_ids=388&offset=24"
+$env:FAVORITE_LIST_NAME="French Canadian"
+$env:DEBUG_URL="http://127.0.0.1:9222"
+
+python add_to_favorites.py

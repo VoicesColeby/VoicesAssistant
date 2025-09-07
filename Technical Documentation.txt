@@ -1,0 +1,35 @@
+Technical Documentation for Developers
+This document details the technical implementation of the invite_to_job_cdp_human.py script. The script uses Playwright with a Chrome DevTools Protocol (CDP) connection to automate a human-like talent invitation workflow on Voices.com.
+
+Automation Flow and Locators
+The script's core logic is encapsulated in process_current_page, which iterates through each talent card and calls invite_single_talent to perform the invitation. The entire process is designed with human-like delays to prevent detection by anti-bot measures.
+
+1. Initial State
+The script connects to a pre-existing Chrome instance via a CDP connection at http://127.0.0.1:9222. This approach is used to maintain a consistent session without triggering login prompts. It navigates to a talent search results page, which is configured via the START_URL environment variable.
+
+2. Inviting a Single Talent
+The invite_single_talent function manages the step-by-step process for one talent card.
+
+Action: Click the main "Invite to Job" button. This button includes a dropdown caret.
+
+Locator: INVITE_BUTTON_WITH_DROPDOWN (button.headbtn.btn.btn-primary:has(i.fa-caret-down)).
+
+Technical Detail: This action reveals a dropdown menu containing a button for inviting the talent to an existing job or creating a new one.
+
+3. Handling the Dropdown Menu
+Action: Find the specific talent card's dropdown menu and click the "Invite to Existing Job" button within it.
+
+Locator: The script first gets the parent of the clicked INVITE_BUTTON_WITH_DROPDOWN and then locates the DROPDOWN_MENU (.dropdown-content, .downmenu .dropdown-content) within that parent. This resolves a strict mode violation by ensuring the locator is unique to the current talent card's context. The button is then located using INVITE_EXISTING_BTN (button.request_a_quote_btn:has-text('Invite to Existing Job')).
+
+4. Interacting with the Modal
+Action: Wait for the modal to become visible and then select the appropriate job from the dropdown menu.
+
+Locator: The modal is located using MODAL_VISIBLE (.modal.show, .modal.fade.show, .modal:visible). The job dropdown is a Choices.js element. The script first locates the modal body (MODAL_BODY) and then finds the choices_container (.choices[data-type='select-one']) within that body to prevent strict mode violation. It then clicks the container to expand the dropdown and selects the option matching the JOB_QUERY.
+
+5. Finalizing the Invitation
+Action: Click the final "Invite to Job" button within the modal.
+
+Locator: MODAL_SUBMIT_BTN (#submit-request-quote).
+
+6. Result Handling
+The script waits for a success, error, or "already invited" message using the check_invitation_result function. It then closes the modal using the Escape key.

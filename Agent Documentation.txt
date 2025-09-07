@@ -1,0 +1,28 @@
+Agent Documentation
+Function
+This tool automates the process of inviting talent on the Voices.com platform. It can be used to send invitations in bulk to a specific job based on a pre-filtered list of talent. The tool's primary function is to replicate human behavior to avoid detection and ensure a smooth, reliable automation process. It handles the full workflow from navigating the search results to submitting the final invitation form within a modal dialog.
+
+Input
+START_URL (string): The URL of the talent search results page. This is the starting point for the automation.
+
+JOB_QUERY (string): A unique identifier for the job, typically a job number (e.g., #818314) or a distinctive part of the job title. This is used to select the correct job from the dropdown menu within the invitation modal.
+
+DEBUG_URL (string): The Chrome DevTools Protocol (CDP) URL to connect to an existing Chrome browser session. This is an internal configuration detail for the automation environment.
+
+Capabilities
+Full Automation: Can process multiple talent cards across multiple pages of search results.
+
+Human-like Interaction: Includes randomized delays between steps and clicks (human_delay, step_pause, invite_pause) to mimic human behavior and prevent anti-bot measures from blocking the script.
+
+Robust Navigation: Uses specific and reliable locators to interact with elements like the main invite button, the dropdown menu, and the modal dialog.
+
+Dynamic Element Handling: Successfully handles dynamic elements within the invitation modal, such as the Choices.js job selection dropdown, by correctly scoping locators to the parent modal.
+
+Error and Result Reporting: Provides clear logging for each action and reports the final status of each invitation as success, already invited, skipped, or failed.
+
+Limitations
+Requires a manual setup step to start the Chrome browser in a specific debugging mode before the script can run.
+
+The JOB_QUERY must be a unique match to a job in the dropdown list for the script to function correctly.
+
+The script is designed for the specific HTML structure of the Voices.com talent search page. Changes to the website's front-end could cause the script to fail.

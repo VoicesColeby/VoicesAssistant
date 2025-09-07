@@ -1,0 +1,34 @@
+User Guide
+This guide will help you use the Python script to invite talent to an existing job on the Voices.com platform. The script automates the process of finding and inviting voice talent, saving you from doing it manually.
+
+Prerequisites
+You'll need to set up a few things before you can run the script. Don't worry, you only have to do this once.
+
+Install Python: If you don't have Python installed, download and install it from the official Python website.
+
+Install Playwright: Open your computer's terminal or command prompt and run the following command:
+pip install playwright
+
+Install Playwright's browsers: After installing Playwright, run this command in your terminal:
+playwright install
+
+Install the Chrome browser: Make sure you have Google Chrome installed on your computer.
+
+Set up Chrome's remote debugging: Open your terminal and run the following command to start Chrome in a special "debugging" mode. Don't close this terminal window.
+"C:\Program Files\Google\Chrome\Application\chrome.exe" --remote-debugging-address=127.0.0.1 --remote-debugging-port=9222 --user-data-dir="C:\temp\cdp"
+
+How to Use the Script
+Open a new terminal or command prompt window.
+
+Navigate to the script's folder: Use the cd command to go to the directory where you saved the invite_to_job_cdp_human.py file. For example: cd C:\Users\Coleby Pearson\Desktop\VoicesAssist
+
+Set the environment variables: This tells the script which website to visit and which job to use. Copy and paste the following commands into your terminal, replacing the example values with your own:
+$env:START_URL="https://www.voices.com/talents/search?keywords=&accent_id=16&language_ids=388"
+$env:JOB_QUERY="#818314"
+$env:DEBUG_URL="http://127.0.0.1:9222"
+
+Run the script: Now you're ready to go! Run the script with this command:
+python invite_to_job_cdp_human.py
+
+The script will take over the Chrome browser window you opened earlier. You'll see it start clicking buttons and filling out forms automatically. The terminal will show you its progress, telling you how many talents have been invited.
+
