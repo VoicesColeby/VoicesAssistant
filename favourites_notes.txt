@@ -1,0 +1,4 @@
+$env:START_URL= "https://www.voices.com/talents/search?keywords=&country_id=1&state_id=33&city=New%20York"
+$env:FAVORITE_LIST_NAME="New York"
+$env:DEBUG_URL="http://127.0.0.1:9222"
+python add_to_favorites.py

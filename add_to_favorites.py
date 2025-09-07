@@ -71,55 +71,51 @@ async def page_pause():
 # =========================
 
 async def safe_click(loc: Locator, timeout: int = DEFAULT_TIMEOUT_MS) -> bool:
-    """Safely click an element with error handling"""
-    try:
-        await loc.wait_for(state="visible", timeout=timeout)
-        await loc.scroll_into_view_if_needed()
-        await human_delay(200)
-        await loc.click()
-        return True
-    except Exception as e:
-        warn(f"Click failed: {str(e)[:100]}")
-        return False
+    """Safely click an element with error handling and retry logic"""
+    for attempt in range(3):
+        try:
+            await loc.wait_for(state="visible", timeout=timeout)
+            await loc.scroll_into_view_if_needed()
+            await human_delay(200)
+            await loc.click()
+            return True
+        except Exception as e:
+            warn(f"Click failed on attempt {attempt + 1}: {str(e)[:100]}")
+            if attempt < 2:
+                await human_delay(500)
+    warn("Click failed after multiple attempts.")
+    return False
 
-async def add_to_favorites_single_talent(page: Page, heart_icon: Locator, favorite_list_name: str, favorites_list_selected: bool) -> (str, bool):
+async def _perform_two_click_favorite_action(page: Page, heart_icon: Locator, favorite_list_name: str) -> str:
     """
-    Adds a single talent to a specified favorites list.
-    Returns: A tuple of (result, updated_favorites_list_selected_state).
+    Performs the full two-click process: heart icon, then list name.
+    Returns: 'favorited', 'already_favorited', or 'failed'
     """
-
-    # Check if the heart icon is already favorited (unselecting behavior)
-    # The 'fas' class indicates a filled heart icon
-    initial_icon_class = await heart_icon.get_attribute("class")
-    initial_is_favorited = "fas" in initial_icon_class
-
     # Step 1: Click the heart icon to open the dropdown
-    info("Clicking heart icon...")
+    info("Clicking heart icon to open dropdown...")
     if not await safe_click(heart_icon, timeout=5000):
-        return 'failed', favorites_list_selected
+        return 'failed'
 
     await human_delay(300)
 
-    # Step 2: Use the parent to find the correct dropdown menu
+    # The dropdown menu container becomes visible after the click.
     try:
-        parent_dropdown = heart_icon.locator("..")
-        favorites_dropdown = parent_dropdown.locator(FAVORITES_DROPDOWN)
-        await favorites_dropdown.wait_for(state="visible", timeout=3000)
+        # Use a scoped locator relative to the heart icon's parent
+        parent_locator = heart_icon.locator("xpath=..")
+        favorites_dropdown = parent_locator.locator(FAVORITES_DROPDOWN)
+        await favorites_dropdown.wait_for(state="visible", timeout=5000)
     except PWTimeout:
         warn("Favorites dropdown menu didn't appear in time.")
-        return 'failed', favorites_list_selected
-
-    # Step 3: Find the specific favorite list button
+        return 'failed'
+    
+    # Step 2: Find the specific favorite list button within the dropdown
     info(f"Looking for list: '{favorite_list_name}'")
-    list_button_selector = FAVORITE_LIST_BTN_BASE.format(favorite_list_name)
-    list_button = favorites_dropdown.locator(list_button_selector)
-
-    # Check if the button for the list exists
+    list_button = favorites_dropdown.locator(FAVORITE_LIST_BTN_BASE.format(favorite_list_name))
+    
     if await list_button.count() == 0:
         warn(f"Could not find favorite list named '{favorite_list_name}'.")
-        # Try to close the menu
         await close_favorites_menu(favorites_dropdown)
-        return 'failed', favorites_list_selected
+        return 'failed'
 
     # Check if the talent is already in the target list (active checkbox)
     is_active = "active" in await list_button.get_attribute("class")
@@ -128,36 +124,29 @@ async def add_to_favorites_single_talent(page: Page, heart_icon: Locator, favori
         info(f"Talent is already in list '{favorite_list_name}'.")
         # Do not click again to avoid un-favoriting
         await close_favorites_menu(favorites_dropdown)
-        return 'already_favorited', favorites_list_selected
-
+        return 'already_favorited'
     else:
-        # Step 4: Click the list button to add to favorites
         info(f"Adding talent to list '{favorite_list_name}'...")
         if not await safe_click(list_button):
             warn("Could not click favorite list button.")
             await close_favorites_menu(favorites_dropdown)
-            return 'failed', favorites_list_selected
+            return 'failed'
 
-        # Wait for the action to complete and menu to close
         await step_pause()
         
-        # The action is complete, close the menu
         await close_favorites_menu(favorites_dropdown)
         
-        # A simple success check is to see if the heart icon's class has changed
         updated_icon_class = await heart_icon.get_attribute("class")
         if "fas" in updated_icon_class:
             ok(f"Successfully added to list '{favorite_list_name}'.")
-            return 'favorited', True
+            return 'favorited'
         
         warn("Could not verify that the talent was added.")
-        return 'failed', favorites_list_selected
-
+        return 'failed'
 
 async def close_favorites_menu(favorites_dropdown: Locator):
     """Close the favorites menu if it's still open"""
     try:
-        # Click the close button or press Escape
         close_button = favorites_dropdown.locator("button.close")
         if await close_button.count() > 0:
             await safe_click(close_button, timeout=1000)
@@ -169,11 +158,7 @@ async def close_favorites_menu(favorites_dropdown: Locator):
 async def process_current_page(page: Page, favorite_list_name: str) -> Dict[str, int]:
     """Process all talent cards on the current page"""
     stats = {"seen": 0, "favorited": 0, "already_favorited": 0, "failed": 0}
-    
-    # State variable to track if we've selected the list on this page
-    favorites_list_selected = False
 
-    # Find all heart icons
     heart_icons = page.locator(HEART_ICON)
     count = await heart_icons.count()
     
@@ -184,33 +169,37 @@ async def process_current_page(page: Page, favorite_list_name: str) -> Dict[str,
     stats["seen"] = count
     info(f"Found {count} talent cards to process")
     
+    # State variable to track if we've successfully set the list on this page
+    is_list_selected_on_page = False
+    
     for i in range(count):
         info(f"\nProcessing talent {i+1}/{count}")
-        
-        # Re-query the icon to avoid stale element issues
         current_icon = page.locator(HEART_ICON).nth(i)
-
-        # Check for filled heart icon before any action
+        
+        # Check for pre-favorited talent
         initial_icon_class = await current_icon.get_attribute("class")
         if "fas" in initial_icon_class:
             info("Talent is already favorited. Skipping.")
             stats["already_favorited"] += 1
             await action_pause()
             continue
-
-        # If a list has not been selected on this page, perform the full two-step process
-        if not favorites_list_selected:
-            result, favorites_list_selected = await add_to_favorites_single_talent(page, current_icon, favorite_list_name, favorites_list_selected)
+            
+        if not is_list_selected_on_page:
+            # For the first unfavorited talent on the page, perform the full two-click action
+            result = await _perform_two_click_favorite_action(page, current_icon, favorite_list_name)
+            if result == 'favorited':
+                is_list_selected_on_page = True
+            
         else:
-            # If a list has already been selected, perform the one-click action
-            info("A list has been selected for this page. Clicking heart icon only.")
+            # For all subsequent unfavorited talents, use the one-click shortcut
+            info("Using one-click shortcut.")
             if await safe_click(current_icon):
-                ok("Successfully added to favorites list.")
                 result = 'favorited'
+                ok("Successfully added to favorites list.")
             else:
-                warn("Failed to perform one-click favorite action.")
                 result = 'failed'
-
+                warn("Failed to add talent with one-click shortcut.")
+        
         if result == 'favorited':
             stats["favorited"] += 1
         elif result == 'already_favorited':
