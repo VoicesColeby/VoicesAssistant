@@ -1062,11 +1062,11 @@ class VoicesAutomationApp:
         # --- Paused ---
         if self.is_paused:
             try:
-                self.play_pause_button.config(state=tk.DISABLED)
+                self.play_pause_button.config(state=tk.NORMAL, text="▶ Resume")
             except Exception:
                 pass
             try:
-                self.pause_button.config(state=tk.NORMAL, text="▶ Resume")
+                self.pause_button.config(state=tk.DISABLED, text="⏸ Pause")
             except Exception:
                 pass
             try:
@@ -1077,7 +1077,7 @@ class VoicesAutomationApp:
 
         # --- Running (active) ---
         try:
-            self.play_pause_button.config(state=tk.DISABLED)
+            self.play_pause_button.config(state=tk.DISABLED, text="▶ Start")
         except Exception:
             pass
         try:
@@ -1091,11 +1091,11 @@ class VoicesAutomationApp:
 
     def set_controls_state(self, running: bool):
         if running:
-            self.play_pause_button.config(state=tk.DISABLED)
+            self.play_pause_button.config(state=tk.DISABLED, text="▶ Start")
             self.pause_button.config(state=tk.NORMAL, text="⏸ Pause")
             self.cancel_button.config(state=tk.NORMAL)
         else:
-            self.play_pause_button.config(state=tk.NORMAL)
+            self.play_pause_button.config(state=tk.NORMAL, text="▶ Start")
             self.pause_button.config(state=tk.DISABLED, text="⏸ Pause")
             self.cancel_button.config(state=tk.DISABLED)
             self.is_paused = False
@@ -1135,14 +1135,12 @@ class VoicesAutomationApp:
                     ch.suspend()
                 p.suspend()
                 self.is_paused = True
-                self.pause_button.config(text="▶ Resume")
                 self.update_console("[i] Paused.\n")
             else:
                 for ch in self._walk_children(p):
                     ch.resume()
                 p.resume()
                 self.is_paused = False
-                self.pause_button.config(text="⏸ Pause")
                 self.update_console("[i] Resumed.\n")
         except Exception as e:
             self.update_console(f"[x] Pause/Resume error: {e}\n")
