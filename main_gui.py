@@ -344,6 +344,12 @@ class VoicesAutomationApp:
             pass
         self.console_text.pack(fill=tk.BOTH, expand=True)
 
+        # Progress bar for script execution
+        self.progress_bar = ttk.Progressbar(
+            self.console_frame, orient=tk.HORIZONTAL, mode='determinate', maximum=1
+        )
+        self.progress_bar.pack(fill=tk.X, pady=(self.spacing['row'], 0))
+
         # Transport Controls at bottom
         transport = ttk.Frame(self.master, padding=(12, self.spacing['section'], 12, self.spacing['section']))
         self._style_frame(transport)
@@ -517,6 +523,9 @@ class VoicesAutomationApp:
         self.console_text.config(state=tk.NORMAL)
         self.console_text.delete(1.0, tk.END)
         self.console_text.config(state=tk.DISABLED)
+
+        # Reset progress bar for new run
+        self._reset_progressbar()
 
         # Start the automation in a new thread to keep the GUI responsive
         try:
@@ -694,6 +703,8 @@ class VoicesAutomationApp:
                     self.set_controls_state(running=False)
                 except Exception:
                     pass
+            # Reset progress bar when run completes
+            self._reset_progressbar()
 
     # ===== Browser bootstrap =====
     def get_debug_port(self) -> int:
@@ -830,10 +841,27 @@ class VoicesAutomationApp:
 
     def update_console(self, text):
         cleaned = self._format_console_line(text)
+        # Update progress bar if line matches "Processing talent X of Y"
+        try:
+            m = re.search(r"Processing talent (\d+) of (\d+)", cleaned)
+            if m:
+                cur = int(m.group(1))
+                total = int(m.group(2))
+                self.progress_bar['maximum'] = total
+                self.progress_bar['value'] = cur
+        except Exception:
+            pass
         self.console_text.config(state=tk.NORMAL)
         self.console_text.insert(tk.END, cleaned)
         self.console_text.see(tk.END)
         self.console_text.config(state=tk.DISABLED)
+
+    def _reset_progressbar(self):
+        try:
+            self.progress_bar['value'] = 0
+            self.progress_bar['maximum'] = 1
+        except Exception:
+            pass
 
     def _run_import_invites(self, base_env: dict):
         # Ask for CSV if not provided via UI
