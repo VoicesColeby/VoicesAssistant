@@ -348,100 +348,44 @@ class VoicesAutomationApp:
         transport = ttk.Frame(self.master, padding=(12, self.spacing['section'], 12, self.spacing['section']))
         self._style_frame(transport)
         transport.pack(side=tk.BOTTOM, fill=tk.X)
-        left = ttk.Frame(transport)
-        self._style_frame(left)
-        left.pack(side=tk.LEFT, padx=self.spacing['inline'])
-        right = ttk.Frame(transport)
-        self._style_frame(right)
-        right.pack(side=tk.RIGHT, padx=self.spacing['inline'])
 
-        # Left area intentionally empty; 'Open Voices' button is at the top
-        # Hide legacy controls moved elsewhere
-        try:
-            self.open_button.pack_forget()
-        except Exception:
-            pass
-        try:
-            self.use_current_page_check.pack_forget()
-        except Exception:
-            pass
+        # Core transport controls: Run, Pause, Cancel
+        self.run_button = ttk.Button(transport, text="▶ Run Automation", width=24, command=self.run_automation)
+        self._style_button(self.run_button, 'primary')
+        self.run_button.pack(side=tk.LEFT, padx=self.spacing['inline'])
 
-        # Right side: transport controls
-        self.play_pause_button = ttk.Button(left, text="▶", width=4, command=self.play_pause)
-        self.play_pause_button.pack(side=tk.LEFT, padx=self.spacing['inline'])
-        self._style_button(self.play_pause_button, 'primary')
-        # Pause/Resume button next to Start (disabled until running)
-        self.pause_button = ttk.Button(left, text="⏸", width=4, state=tk.DISABLED, command=self.toggle_pause)
-        self.pause_button.pack(side=tk.LEFT, padx=self.spacing['inline'])
+        self.pause_button = ttk.Button(transport, text="⏸ Pause", width=10, state=tk.DISABLED, command=self.toggle_pause)
         self._style_button(self.pause_button, 'secondary')
+        self.pause_button.pack(side=tk.LEFT, padx=self.spacing['inline'])
+
+        self.cancel_button = ttk.Button(transport, text="⏹ Cancel", width=10, state=tk.DISABLED, command=self.cancel_run)
+        try:
+            self.cancel_button.configure(style='Danger.TButton')
+        except Exception:
+            self._style_button(self.cancel_button, 'secondary')
+        self.cancel_button.pack(side=tk.LEFT, padx=self.spacing['inline'])
+
         # Speed slider on the right with dynamic label and endpoints
-        speed_row = ttk.Frame(right)
+        speed_row = ttk.Frame(transport)
         speed_row.pack(side=tk.RIGHT, padx=self.spacing['inline'])
         self.speed_var = tk.DoubleVar(value=5.0)  # 1.0 slow .. 5.0 fast
         self.speed_value_label = ttk.Label(speed_row, text="Speed: 5.0")
         self.speed_value_label.pack(side=tk.TOP, anchor='e')
+
         def _on_speed(val):
             try:
                 v = float(val)
                 self.speed_value_label.config(text=f"Speed: {v:.1f}")
             except Exception:
                 pass
-            # Override with clean icon-only label
-            try:
-                self.play_pause_button.config(text=("▶" if self.is_paused else "⏸"))
-            except Exception:
-                pass
+
         lblrow = ttk.Frame(speed_row)
         lblrow.pack(side=tk.TOP, fill=tk.X)
         ttk.Label(lblrow, text="Slow").pack(side=tk.LEFT)
         ttk.Label(lblrow, text="Fast").pack(side=tk.RIGHT)
         ttk.Scale(speed_row, from_=1.0, to=5.0, variable=self.speed_var, orient=tk.HORIZONTAL, length=180, command=_on_speed).pack(side=tk.TOP)
-        self.cancel_button = ttk.Button(right, text="⏹ Cancel", width=14, state=tk.DISABLED, command=self.cancel_run)
-        self.cancel_button.pack(side=tk.LEFT, padx=self.spacing['inline'])
-        try:
-            self.cancel_button.configure(style='Danger.TButton')
-        except Exception:
-            self._style_button(self.cancel_button, 'secondary')
-        # Recreate Cancel on the left as requested
-        try:
-            self.cancel_button.destroy()
-        except Exception:
-            pass
-        self.cancel_button = ttk.Button(left, text="⏹", width=4, state=tk.DISABLED, command=self.cancel_run)
-        self.cancel_button.pack(side=tk.LEFT, padx=self.spacing['inline'])
-        try:
-            self.cancel_button.configure(style='Danger.TButton')
-        except Exception:
-            self._style_button(self.cancel_button, 'secondary')
+
         # Removed global Save Fields button; Save Message lives on Message tab
-
-        # Replace older play/pause icon button with explicit Start + Pause/Play
-        try:
-            # Remove the old play/pause button if present
-            if hasattr(self, 'play_pause_button') and self.play_pause_button:
-                try:
-                    self.play_pause_button.destroy()
-                except Exception:
-                    pass
-        except Exception:
-            pass
-
-        # Normalize labels and sizes
-        try:
-            # Removed pause button
-            self.cancel_button.config(text="Cancel", width=10)
-        except Exception:
-            pass
-
-        # Add a clear Start button for running automation, positioned before Pause
-        self.run_button = ttk.Button(right, text="▶ Run Automation", width=24, command=self.run_automation)
-        # Place primary run button at the far left of right controls
-        self.run_button.pack(side=tk.LEFT, padx=self.spacing['inline'])
-        self._style_button(self.run_button, 'primary')
-        try:
-            self.run_button.config(text="Start Helper")
-        except Exception:
-            pass
 
     def show_input_fields(self, action):
         # Clear previous fields
@@ -1025,7 +969,7 @@ class VoicesAutomationApp:
             except Exception:
                 pass
             try:
-                self.play_pause_button.config(text="⏸ Pause")
+                self.pause_button.config(state=tk.NORMAL, text="⏸ Pause" if not self.is_paused else "▶ Resume")
             except Exception:
                 pass
             try:
@@ -1038,37 +982,25 @@ class VoicesAutomationApp:
             except Exception:
                 pass
             try:
-                # Keep existing label; do not override here
-                pass
+                self.pause_button.config(state=tk.DISABLED, text="⏸ Pause")
             except Exception:
                 pass
             try:
                 self.cancel_button.config(state=tk.DISABLED)
             except Exception:
                 pass
-    def play_pause(self):
-        with self.process_lock:
-            proc = self.process
-        if not proc or proc.poll() is not None:
-            # Not running: start automation
-            self.run_automation()
-            return
-        # Running: toggle pause/resume via the pause button handler
-        self.toggle_pause()
+            self.is_paused = False
+
     def set_controls_state(self, running: bool):
         if running:
-            self.play_pause_button.config(state=tk.NORMAL, text="▶ Run Automation")
+            self.run_button.config(state=tk.DISABLED)
             self.pause_button.config(state=tk.NORMAL, text="⏸ Pause")
             self.cancel_button.config(state=tk.NORMAL)
         else:
-            self.play_pause_button.config(state=tk.NORMAL, text="▶ Run Automation")
-            self.pause_button.config(state=tk.DISABLED, text="Pause/Play")
+            self.run_button.config(state=tk.NORMAL)
+            self.pause_button.config(state=tk.DISABLED, text="⏸ Pause")
             self.cancel_button.config(state=tk.DISABLED)
-        # Normalize primary button label regardless of state
-            try:
-                self.play_pause_button.config(text="▶")
-            except Exception:
-                pass
+            self.is_paused = False
 
     def _walk_children(self, psutil_proc):
         try:
@@ -1089,12 +1021,11 @@ class VoicesAutomationApp:
         p = psutil.Process(proc.pid)
         try:
             if not self.is_paused:
-                # Suspend process tree
                 for ch in self._walk_children(p):
                     ch.suspend()
                 p.suspend()
                 self.is_paused = True
-                self.pause_button.config(text="▶ Play")
+                self.pause_button.config(text="▶ Resume")
                 self.update_console("[i] Paused.\n")
             else:
                 for ch in self._walk_children(p):
@@ -1103,9 +1034,14 @@ class VoicesAutomationApp:
                 self.is_paused = False
                 self.pause_button.config(text="⏸ Pause")
                 self.update_console("[i] Resumed.\n")
-            # Normalize pause button label after toggle
+
+            # Ensure run and cancel buttons stay consistent while toggling
             try:
-                self.pause_button.config(text=("▶ Play" if self.is_paused else "⏸ Pause"))
+                self.run_button.config(state=tk.DISABLED)
+            except Exception:
+                pass
+            try:
+                self.cancel_button.config(state=tk.NORMAL)
             except Exception:
                 pass
         except Exception as e:
@@ -1152,7 +1088,13 @@ class VoicesAutomationApp:
                 pass
             self.update_console("[i] Canceled run (basic).\n")
         finally:
-            pass
+            try:
+                self.apply_controls_state(running=False)
+            except Exception:
+                try:
+                    self.set_controls_state(running=False)
+                except Exception:
+                    pass
 
     def _try_close_browser(self):
         bp = self.browser_process
