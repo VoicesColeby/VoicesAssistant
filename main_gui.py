@@ -1144,18 +1144,9 @@ class VoicesAutomationApp:
                 self.is_paused = False
                 self.pause_button.config(text="⏸ Pause")
                 self.update_console("[i] Resumed.\n")
-
-            # Ensure run and cancel buttons stay consistent while toggling
-            try:
-                self.play_pause_button.config(state=tk.DISABLED)
-            except Exception:
-                pass
-            try:
-                self.cancel_button.config(state=tk.NORMAL)
-            except Exception:
-                pass
         except Exception as e:
             self.update_console(f"[x] Pause/Resume error: {e}\n")
+        self.apply_controls_state(running=True)
 
     def cancel_run(self):
         with self.process_lock:
