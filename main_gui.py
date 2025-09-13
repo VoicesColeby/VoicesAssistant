@@ -13,6 +13,7 @@ import urllib.parse
 import webbrowser
 import math
 import re
+import time
 
 class VoicesAutomationApp:
     def __init__(self, master):
@@ -67,6 +68,56 @@ class VoicesAutomationApp:
         self.create_widgets()
         self.load_saved_fields()
         self.apply_saved_settings()
+
+    # Simple tooltip helper
+    class _Tooltip:
+        def __init__(self, widget, text):
+            self.widget = widget
+            self.text = text
+            self.tip = None
+            try:
+                widget.bind('<Enter>', self._show)
+                widget.bind('<Leave>', self._hide)
+            except Exception:
+                pass
+        def _show(self, _evt=None):
+            try:
+                if self.tip:
+                    return
+                x = self.widget.winfo_rootx() + 20
+                y = self.widget.winfo_rooty() + self.widget.winfo_height() + 10
+                self.tip = tk.Toplevel(self.widget)
+                self.tip.wm_overrideredirect(True)
+                self.tip.wm_geometry(f'+{x}+{y}')
+                lbl = ttk.Label(self.tip, text=self.text, background='#FFFFE0', relief=tk.SOLID, borderwidth=1)
+                lbl.pack(ipadx=6, ipady=3)
+            except Exception:
+                self.tip = None
+        def _hide(self, _evt=None):
+            try:
+                if self.tip:
+                    self.tip.destroy()
+                    self.tip = None
+            except Exception:
+                pass
+
+    @property
+    def speed_file_path(self) -> str:
+        try:
+            return os.path.join(os.path.dirname(os.path.abspath(__file__)), 'speed.cfg')
+        except Exception:
+            return 'speed.cfg'
+
+    def _write_speed_file(self, value: float = None):
+        try:
+            v = float(value) if value is not None else float(getattr(self, 'speed_var', tk.DoubleVar(value=5.0)).get())
+        except Exception:
+            v = 5.0
+        try:
+            with open(self.speed_file_path, 'w', encoding='utf-8') as f:
+                f.write(f"{v:.2f}")
+        except Exception:
+            pass
 
     def _init_theme(self):
         try:
@@ -312,8 +363,10 @@ class VoicesAutomationApp:
         self.play_pause_button = ttk.Button(left, text="▶", width=4, command=self.play_pause)
         self.play_pause_button.pack(side=tk.LEFT, padx=self.spacing['inline'])
         self._style_button(self.play_pause_button, 'primary')
-        # Keep compatibility: map old pause_button references to the main button
-        self.pause_button = self.play_pause_button
+        # Pause/Resume button next to Start (disabled until running)
+        self.pause_button = ttk.Button(left, text="⏸", width=4, state=tk.DISABLED, command=self.toggle_pause)
+        self.pause_button.pack(side=tk.LEFT, padx=self.spacing['inline'])
+        self._style_button(self.pause_button, 'secondary')
         # Speed slider on the right with dynamic label and endpoints
         speed_row = ttk.Frame(right)
         speed_row.pack(side=tk.RIGHT, padx=self.spacing['inline'])
@@ -412,23 +465,47 @@ class VoicesAutomationApp:
             self._style_button(save_msg_btn, 'secondary')
 
         elif action == "import_invites":
-            row = ttk.Frame(self.input_frame)
-            self._style_frame(row, as_panel=True)
-            row.pack(fill=tk.X, pady=2)
-            lbl = ttk.Label(row, text="CSV File:", width=20, anchor="w")
-            lbl.pack(side=tk.LEFT, padx=5)
             self._import_csv_var = tk.StringVar(value="")
-            path_entry = ttk.Entry(row, width=50, textvariable=self._import_csv_var)
-            path_entry.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=5)
+            # Create a simple drop/select area
+            panel = ttk.Frame(self.input_frame)
+            self._style_frame(panel, as_panel=True)
+            panel.pack(fill=tk.BOTH, expand=True, pady=6)
+            hint = ttk.Label(panel, text="Drop CSV here or click to select", anchor="center")
+            hint.pack(fill=tk.BOTH, expand=True, padx=8, pady=16)
             def _browse_csv():
                 p = filedialog.askopenfilename(title="Select CSV", filetypes=[("CSV Files", "*.csv"), ("All Files", "*.*")])
                 if p:
                     try:
                         self._import_csv_var.set(p)
+                        hint.config(text=f"Selected: {os.path.basename(p)}")
                     except Exception:
                         pass
-            browse = ttk.Button(row, text="Browse…", command=_browse_csv)
-            browse.pack(side=tk.LEFT, padx=5)
+            # Click to select
+            try:
+                hint.bind('<Button-1>', lambda e: _browse_csv())
+            except Exception:
+                pass
+            # Optional drag-and-drop support via tkinterdnd2 if available
+            try:
+                from tkinterdnd2 import DND_FILES  # type: ignore
+                def _on_drop(event):
+                    try:
+                        # event.data may contain one or more paths; take first
+                        raw = event.data.strip()
+                        if raw.startswith('{') and raw.endswith('}'):
+                            raw = raw[1:-1]
+                        path = raw.split()[0]
+                        if path:
+                            self._import_csv_var.set(path)
+                            hint.config(text=f"Selected: {os.path.basename(path)}")
+                    except Exception:
+                        pass
+                hint.drop_target_register(DND_FILES)
+                hint.dnd_bind('<<Drop>>', _on_drop)
+            except Exception:
+                pass
+            # Immediately prompt for selection to streamline flow
+            _browse_csv()
 
         # Prefill from saved values if available
         self.prefill_saved_fields()
@@ -1178,3 +1255,4 @@ if __name__ == "__main__":
     root = tk.Tk()
     app = VoicesAutomationApp(root)
     root.mainloop()
+
