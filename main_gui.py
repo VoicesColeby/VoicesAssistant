@@ -40,9 +40,9 @@ class VoicesAutomationApp:
             'btn_active': '#9CA3AF',
         }
         self.spacing = {
-            'section': 16,
+            'section': 12,
             'row': 8,
-            'inline': 10,
+            'inline': 8,
         }
         self.fonts = {
             'title': tkfont.Font(family='Segoe UI', size=16, weight='bold'),
@@ -293,32 +293,34 @@ class VoicesAutomationApp:
         action_frame.grid(row=0, column=0, sticky="ew")
         grid = ttk.Frame(action_frame)
         grid.pack(side=tk.LEFT)
+        grid.grid_columnconfigure(0, minsize=160)
+        grid.grid_columnconfigure(1, minsize=160)
         # 2x2 grid of action buttons
-        self.invite_button = ttk.Button(grid, text="Invite to Job", width=20, command=lambda: self.show_input_fields("invite"))
+        self.invite_button = ttk.Button(grid, text="Invite to Job", command=lambda: self.show_input_fields("invite"))
         self._style_button(self.invite_button, 'secondary')
-        self.invite_button.grid(row=0, column=0, padx=self.spacing['inline'], pady=6, sticky='w')
+        self.invite_button.grid(row=0, column=0, padx=self.spacing['inline'], pady=self.spacing['row'], sticky='w')
         self._Tooltip(
             self.invite_button,
             "Prepare fields to invite talents to a job. Open the job page in Voices first.",
         )
-        self.favorites_button = ttk.Button(grid, text="Add to Favorites", width=20, command=lambda: self.show_input_fields("favorites"))
+        self.favorites_button = ttk.Button(grid, text="Add to Favorites", command=lambda: self.show_input_fields("favorites"))
         self._style_button(self.favorites_button, 'secondary')
-        self.favorites_button.grid(row=0, column=1, padx=self.spacing['inline'], pady=6, sticky='w')
+        self.favorites_button.grid(row=0, column=1, padx=self.spacing['inline'], pady=self.spacing['row'], sticky='w')
         self._Tooltip(
             self.favorites_button,
             "Add talents to your Favorites list. Make sure a Voices talent page is loaded.",
         )
-        self.message_button = ttk.Button(grid, text="Message Talent", width=20, command=lambda: self.show_input_fields("message"))
+        self.message_button = ttk.Button(grid, text="Message Talent", command=lambda: self.show_input_fields("message"))
         self._style_button(self.message_button, 'secondary')
-        self.message_button.grid(row=1, column=0, padx=self.spacing['inline'], pady=6, sticky='w')
+        self.message_button.grid(row=1, column=0, padx=self.spacing['inline'], pady=self.spacing['row'], sticky='w')
         self._Tooltip(
             self.message_button,
             "Compose and send a message to talents. Requires a Voices messaging page.",
         )
         # New: Import Invites (CSV of usernames)
-        self.import_button = ttk.Button(grid, text="Import Invites", width=20, command=lambda: self.show_input_fields("import_invites"))
+        self.import_button = ttk.Button(grid, text="Import Invites", command=lambda: self.show_input_fields("import_invites"))
         self._style_button(self.import_button, 'secondary')
-        self.import_button.grid(row=1, column=1, padx=self.spacing['inline'], pady=6, sticky='w')
+        self.import_button.grid(row=1, column=1, padx=self.spacing['inline'], pady=self.spacing['row'], sticky='w')
         self._Tooltip(
             self.import_button,
             "Bulk invite talents from a CSV of usernames. Select the file before running.",
@@ -335,7 +337,7 @@ class VoicesAutomationApp:
         if self.voices_logo_img is not None:
             self.open_button_top = ttk.Button(action_frame, image=self.voices_logo_img, command=self.open_browser)
         else:
-            self.open_button_top = ttk.Button(action_frame, text="Open Voices", width=16, command=self.open_browser)
+            self.open_button_top = ttk.Button(action_frame, text="Open Voices", command=self.open_browser)
         self._style_button(self.open_button_top, 'secondary')
         self.open_button_top.pack(side=tk.RIGHT, padx=self.spacing['inline'])
         self._Tooltip(
@@ -373,7 +375,7 @@ class VoicesAutomationApp:
         self.console_frame.grid(
             row=0,
             column=0,
-            padx=8,
+            padx=self.spacing['inline'],
             pady=(self.spacing['section'] // 2, self.spacing['section'] // 2),
             sticky="nsew",
         )
@@ -411,7 +413,7 @@ class VoicesAutomationApp:
         transport.grid(row=2, column=0, sticky="ew")
 
         # Core transport controls: Run, Pause, Cancel
-        self.play_pause_button = ttk.Button(transport, text="▶ Start", width=24, command=self.play_pause)
+        self.play_pause_button = ttk.Button(transport, text="▶ Start", command=self.play_pause)
         self._style_button(self.play_pause_button, 'primary')
         self.play_pause_button.pack(side=tk.LEFT, padx=self.spacing['inline'])
         self._Tooltip(
@@ -419,7 +421,7 @@ class VoicesAutomationApp:
             "Execute the selected action. Ensure required inputs and the Voices page are ready.",
         )
 
-        self.pause_button = ttk.Button(transport, text="⏸ Pause", width=10, state=tk.DISABLED, command=self.toggle_pause)
+        self.pause_button = ttk.Button(transport, text="⏸ Pause", state=tk.DISABLED, command=self.toggle_pause)
         self._style_button(self.pause_button, 'secondary')
         self.pause_button.pack(side=tk.LEFT, padx=self.spacing['inline'])
         self._Tooltip(
@@ -427,7 +429,7 @@ class VoicesAutomationApp:
             "Temporarily halt the automation; click again to resume.",
         )
 
-        self.cancel_button = ttk.Button(transport, text="⏹ Cancel", width=10, state=tk.DISABLED, command=self.cancel_run)
+        self.cancel_button = ttk.Button(transport, text="⏹ Cancel", state=tk.DISABLED, command=self.cancel_run)
         try:
             self.cancel_button.configure(style='Danger.TButton')
         except Exception:
@@ -485,7 +487,7 @@ class VoicesAutomationApp:
             btn_row = ttk.Frame(self.input_frame)
             self._style_frame(btn_row, as_panel=True)
             btn_row.pack(fill=tk.X, pady=(6, 2))
-            save_msg_btn = ttk.Button(btn_row, text="💾 Save Message", width=18, command=self.save_fields)
+            save_msg_btn = ttk.Button(btn_row, text="💾 Save Message", command=self.save_fields)
             save_msg_btn.pack(side=tk.LEFT)
             try:
                 save_msg_btn.config(text="Save Message")
@@ -564,7 +566,7 @@ class VoicesAutomationApp:
             entry.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=5)
             self.input_fields[var_name] = entry
             if var_name == 'url':
-                open_btn = ttk.Button(row_frame, text="Open Voices", command=self.open_browser, width=18)
+                open_btn = ttk.Button(row_frame, text="Open Voices", command=self.open_browser)
                 open_btn.pack(side=tk.LEFT, padx=8)
                 self._style_button(open_btn, 'secondary')
 
