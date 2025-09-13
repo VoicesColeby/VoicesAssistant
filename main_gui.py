@@ -286,16 +286,32 @@ class VoicesAutomationApp:
         self.invite_button = ttk.Button(grid, text="Invite to Job", width=20, command=lambda: self.show_input_fields("invite"))
         self._style_button(self.invite_button, 'secondary')
         self.invite_button.grid(row=0, column=0, padx=self.spacing['inline'], pady=6, sticky='w')
+        self._Tooltip(
+            self.invite_button,
+            "Prepare fields to invite talents to a job. Open the job page in Voices first.",
+        )
         self.favorites_button = ttk.Button(grid, text="Add to Favorites", width=20, command=lambda: self.show_input_fields("favorites"))
         self._style_button(self.favorites_button, 'secondary')
         self.favorites_button.grid(row=0, column=1, padx=self.spacing['inline'], pady=6, sticky='w')
+        self._Tooltip(
+            self.favorites_button,
+            "Add talents to your Favorites list. Make sure a Voices talent page is loaded.",
+        )
         self.message_button = ttk.Button(grid, text="Message Talent", width=20, command=lambda: self.show_input_fields("message"))
         self._style_button(self.message_button, 'secondary')
         self.message_button.grid(row=1, column=0, padx=self.spacing['inline'], pady=6, sticky='w')
+        self._Tooltip(
+            self.message_button,
+            "Compose and send a message to talents. Requires a Voices messaging page.",
+        )
         # New: Import Invites (CSV of usernames)
         self.import_button = ttk.Button(grid, text="Import Invites", width=20, command=lambda: self.show_input_fields("import_invites"))
         self._style_button(self.import_button, 'secondary')
         self.import_button.grid(row=1, column=1, padx=self.spacing['inline'], pady=6, sticky='w')
+        self._Tooltip(
+            self.import_button,
+            "Bulk invite talents from a CSV of usernames. Select the file before running.",
+        )
         # Track mode buttons for highlight toggling
         self.mode_buttons = {
             'invite': self.invite_button,
@@ -311,6 +327,10 @@ class VoicesAutomationApp:
             self.open_button_top = ttk.Button(action_frame, text="Open Voices", width=16, command=self.open_browser)
         self._style_button(self.open_button_top, 'secondary')
         self.open_button_top.pack(side=tk.RIGHT, padx=self.spacing['inline'])
+        self._Tooltip(
+            self.open_button_top,
+            "Open the Voices website in your default browser.",
+        )
 
         # Content area: left (inputs) and right (console)
         content = ttk.Frame(self.master, padding=(12, self.spacing['section']))
@@ -359,10 +379,18 @@ class VoicesAutomationApp:
         self.run_button = ttk.Button(transport, text="▶ Run Automation", width=24, command=self.run_automation)
         self._style_button(self.run_button, 'primary')
         self.run_button.pack(side=tk.LEFT, padx=self.spacing['inline'])
+        self._Tooltip(
+            self.run_button,
+            "Execute the selected action. Ensure required inputs and the Voices page are ready.",
+        )
 
         self.pause_button = ttk.Button(transport, text="⏸ Pause", width=10, state=tk.DISABLED, command=self.toggle_pause)
         self._style_button(self.pause_button, 'secondary')
         self.pause_button.pack(side=tk.LEFT, padx=self.spacing['inline'])
+        self._Tooltip(
+            self.pause_button,
+            "Temporarily halt the automation; click again to resume.",
+        )
 
         self.cancel_button = ttk.Button(transport, text="⏹ Cancel", width=10, state=tk.DISABLED, command=self.cancel_run)
         try:
@@ -370,6 +398,10 @@ class VoicesAutomationApp:
         except Exception:
             self._style_button(self.cancel_button, 'secondary')
         self.cancel_button.pack(side=tk.LEFT, padx=self.spacing['inline'])
+        self._Tooltip(
+            self.cancel_button,
+            "Stop the current automation and reset progress.",
+        )
 
         # Speed slider on the right with dynamic label and endpoints
         speed_row = ttk.Frame(transport)
