@@ -1040,22 +1040,12 @@ class VoicesAutomationApp:
 
     # ===== Controls =====
     def apply_controls_state(self, running: bool):
-        if running:
+        """Enable/disable transport controls based on running/paused state."""
+
+        # --- Not running ---
+        if not running:
             try:
-                self.play_pause_button.config(state=tk.DISABLED)
-            except Exception:
-                pass
-            try:
-                self.pause_button.config(state=tk.NORMAL, text="⏸ Pause" if not self.is_paused else "▶ Resume")
-            except Exception:
-                pass
-            try:
-                self.cancel_button.config(state=tk.NORMAL)
-            except Exception:
-                pass
-        else:
-            try:
-                self.play_pause_button.config(state=tk.NORMAL)
+                self.play_pause_button.config(state=tk.NORMAL, text="▶ Start")
             except Exception:
                 pass
             try:
@@ -1067,6 +1057,37 @@ class VoicesAutomationApp:
             except Exception:
                 pass
             self.is_paused = False
+            return
+
+        # --- Paused ---
+        if self.is_paused:
+            try:
+                self.play_pause_button.config(state=tk.DISABLED)
+            except Exception:
+                pass
+            try:
+                self.pause_button.config(state=tk.NORMAL, text="▶ Resume")
+            except Exception:
+                pass
+            try:
+                self.cancel_button.config(state=tk.NORMAL)
+            except Exception:
+                pass
+            return
+
+        # --- Running (active) ---
+        try:
+            self.play_pause_button.config(state=tk.DISABLED)
+        except Exception:
+            pass
+        try:
+            self.pause_button.config(state=tk.NORMAL, text="⏸ Pause")
+        except Exception:
+            pass
+        try:
+            self.cancel_button.config(state=tk.NORMAL)
+        except Exception:
+            pass
 
     def set_controls_state(self, running: bool):
         if running:
