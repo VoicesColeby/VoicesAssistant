@@ -38,8 +38,14 @@ PAUSE_FILE = os.environ.get("VOICES_PAUSE_FILE", "PAUSE").strip()
 
 # limits & pacing
 TARGET_INVITES = 999999  # effectively "all"; lower if you want to cap
-CLICK_PAUSE = (0.9, 1.8) # per-click jitter
-PAGE_PAUSE  = (2.0, 4.0) # between pages
+CLICK_PAUSE = (
+    float(os.environ.get("VOICES_CLICK_PAUSE_MIN", 0.9)),
+    float(os.environ.get("VOICES_CLICK_PAUSE_MAX", 1.8)),
+)  # per-click jitter
+PAGE_PAUSE = (
+    float(os.environ.get("VOICES_PAGE_PAUSE_MIN", 2.0)),
+    float(os.environ.get("VOICES_PAGE_PAUSE_MAX", 4.0)),
+)  # between pages
 SCROLL_PASSES = 2        # help trigger lazy-loading on each page
 
 # dry-run and logging
@@ -109,8 +115,15 @@ NEXT_LINK_SEL = ", ".join([
     ".pagination a:has(i.fa-chevron-right)",
 ])
 
-async def jitter(a,b):
-    await asyncio.sleep(random.uniform(a,b))
+async def jitter(a, b, label: str = "pause"):
+    delay = random.uniform(a, b)
+    log_event({"type": "delay", "label": label, "delay": delay})
+    try:
+        print(f"[delay] {label}: {delay:.2f}s")
+    except Exception:
+        pass
+    await asyncio.sleep(delay)
+    return delay
 
 def load_checkpoint():
     if Path(CHECKPOINT).exists():
@@ -2135,7 +2148,7 @@ async def invite_all_on_page(page) -> int:
                             else:
                                 log_event({"type": "favorited", "url": page.url, "talent_id": talent_id, "phase": "initializer"})
                             invited += 1
-                            await jitter(*CLICK_PAUSE)
+                            await jitter(*CLICK_PAUSE, label="CLICK_PAUSE")
                             continue
                     else:
                         # After initial selection on this page, just click hearts for non-favorited cards
@@ -2148,7 +2161,7 @@ async def invite_all_on_page(page) -> int:
                             else:
                                 log_event({"type": "favorited", "url": page.url, "talent_id": talent_id})
                             invited += 1
-                            await jitter(*CLICK_PAUSE)
+                            await jitter(*CLICK_PAUSE, label="CLICK_PAUSE")
                             continue
                 except Exception:
                     pass
@@ -2197,7 +2210,7 @@ async def invite_all_on_page(page) -> int:
                     if talent_id:
                         invited_db_add(talent_id, url=page.url)
                 invited += 1
-                await jitter(*CLICK_PAUSE)
+                await jitter(*CLICK_PAUSE, label="CLICK_PAUSE")
         except Exception:
             # element may detach due to reflow; move on
             continue
@@ -2230,7 +2243,7 @@ async def invite_all_on_page(page) -> int:
                             favorites_selected_this_page = True
                             log_event({"type": "favorited", "url": page.url, "phase": "initializer"})
                             clicked += 1
-                            await jitter(*CLICK_PAUSE)
+                            await jitter(*CLICK_PAUSE, label="CLICK_PAUSE")
                     else:
                         # After initialization, click hearts for non-active items only
                         if active:
@@ -2239,7 +2252,7 @@ async def invite_all_on_page(page) -> int:
                         if ok:
                             log_event({"type": "favorited", "url": page.url})
                             clicked += 1
-                            await jitter(*CLICK_PAUSE)
+                            await jitter(*CLICK_PAUSE, label="CLICK_PAUSE")
                 except Exception:
                     continue
             if clicked > 0:
@@ -2300,7 +2313,7 @@ async def invite_all_on_page(page) -> int:
                             if talent_id:
                                 invited_db_add(talent_id, url=page.url)
                         invited += 1
-                        await jitter(*CLICK_PAUSE)
+                        await jitter(*CLICK_PAUSE, label="CLICK_PAUSE")
                 except Exception:
                     continue
         except Exception:
@@ -2346,7 +2359,7 @@ async def goto_next_page(page) -> bool:
                 await page.wait_for_load_state("networkidle")
             except PWTimeout:
                 await page.wait_for_load_state("domcontentloaded")
-            await asyncio.sleep(random.uniform(*PAGE_PAUSE))
+            await jitter(*PAGE_PAUSE, label="PAGE_PAUSE")
             return True
     except Exception:
         pass
@@ -2364,7 +2377,7 @@ async def goto_next_page(page) -> bool:
                 if t == target:
                     await n.click()
                     await page.wait_for_load_state("networkidle")
-                    await asyncio.sleep(random.uniform(*PAGE_PAUSE))
+                    await jitter(*PAGE_PAUSE, label="PAGE_PAUSE")
                     return True
     except Exception:
         pass
@@ -2389,7 +2402,7 @@ async def goto_next_page(page) -> bool:
             await page.wait_for_load_state("networkidle")
         except PWTimeout:
             await page.wait_for_load_state("domcontentloaded")
-        await asyncio.sleep(random.uniform(*PAGE_PAUSE))
+        await jitter(*PAGE_PAUSE, label="PAGE_PAUSE")
         return True
     except Exception:
         pass
@@ -2406,6 +2419,11 @@ async def main(
 ):
     state = load_checkpoint()
     invited_total = state["invited"]
+    log_event({"type": "delay", "label": "slow_mo", "delay": slow_mo / 1000})
+    try:
+        print(f"[delay] slow_mo: {slow_mo}ms")
+    except Exception:
+        pass
 
     async with async_playwright() as p:
         using_persistent = False
@@ -2516,7 +2534,7 @@ async def main(
         await login_if_needed(context, page, manual_login=manual_login)
         await page.goto(START_URL)
         await page.wait_for_load_state("networkidle")
-        await asyncio.sleep(random.uniform(*PAGE_PAUSE))
+        await jitter(*PAGE_PAUSE, label="PAGE_PAUSE")
 
         while invited_total < TARGET_INVITES:
             await pause_if_requested()
@@ -2528,7 +2546,7 @@ async def main(
                 print(f"Invited on this page: {added} | Total: {invited_total}")
             save_checkpoint({"page_num": state["page_num"] + 1, "invited": invited_total})
 
-            await asyncio.sleep(random.uniform(*PAGE_PAUSE))
+            await jitter(*PAGE_PAUSE, label="PAGE_PAUSE")
             if added == 0:
                 # still try to move on—maybe all on this page were already invited
                 pass
@@ -2621,6 +2639,26 @@ def _parse_cli_args():
         help="Number of vertical scroll passes per page to trigger lazy loading (default: 2).",
     )
     parser.add_argument(
+        "--click-pause-min",
+        type=float,
+        help="Minimum seconds for click jitter.",
+    )
+    parser.add_argument(
+        "--click-pause-max",
+        type=float,
+        help="Maximum seconds for click jitter.",
+    )
+    parser.add_argument(
+        "--page-pause-min",
+        type=float,
+        help="Minimum seconds between pages.",
+    )
+    parser.add_argument(
+        "--page-pause-max",
+        type=float,
+        help="Maximum seconds between pages.",
+    )
+    parser.add_argument(
         "--manual-login",
         action="store_true",
         help="Pause automation and let you log in manually (e.g., Google SSO).",
@@ -2670,6 +2708,14 @@ if __name__ == "__main__":
             del os.environ["VOICES_JOB_TITLE"]
     if _args.scroll_passes is not None:
         SCROLL_PASSES = int(_args.scroll_passes)
+    if _args.click_pause_min is not None:
+        CLICK_PAUSE = (float(_args.click_pause_min), CLICK_PAUSE[1])  # type: ignore[name-defined]
+    if _args.click_pause_max is not None:
+        CLICK_PAUSE = (CLICK_PAUSE[0], float(_args.click_pause_max))  # type: ignore[name-defined]
+    if _args.page_pause_min is not None:
+        PAGE_PAUSE = (float(_args.page_pause_min), PAGE_PAUSE[1])  # type: ignore[name-defined]
+    if _args.page_pause_max is not None:
+        PAGE_PAUSE = (PAGE_PAUSE[0], float(_args.page_pause_max))  # type: ignore[name-defined]
     if _args.pause_file:
         PAUSE_FILE = _args.pause_file  # type: ignore[name-defined]
     # Logging config
