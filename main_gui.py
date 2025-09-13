@@ -143,31 +143,81 @@ class VoicesAutomationApp:
             style.configure('TLabelframe.Label', background=self.colors['panel'], foreground=self.colors['text'], font=self.fonts['heading'])
             style.configure('TLabel', background=self.colors['bg'], foreground=self.colors['text'])
             style.configure('TCheckbutton', background=self.colors['bg'], foreground=self.colors['text'], padding=6)
-            style.configure('TEntry', fieldbackground='#FFFFFF', padding=6)
+            style.configure(
+                'TEntry',
+                fieldbackground='#FFFFFF',
+                padding=(20, 14),
+                focuscolor=self.colors['accent'],
+                focusborderwidth=2,
+            )
 
             # Secondary (light gray) button
-            style.configure('Secondary.TButton', background=self.colors['btn_bg'], foreground=self.colors['text'], padding=(14, 8), relief='flat', font=self.fonts['button'])
-            style.map('Secondary.TButton',
-                      background=[('active', self.colors['btn_hover']), ('pressed', self.colors['btn_active'])],
-                      relief=[('pressed', 'flat'), ('!pressed', 'flat')])
+            style.configure(
+                'Secondary.TButton',
+                background=self.colors['btn_bg'],
+                foreground=self.colors['text'],
+                padding=(20, 14),
+                relief='flat',
+                font=self.fonts['button'],
+                focuscolor=self.colors['accent'],
+                focusborderwidth=2,
+            )
+            style.map(
+                'Secondary.TButton',
+                background=[('active', self.colors['btn_hover']), ('pressed', self.colors['btn_active'])],
+                relief=[('pressed', 'flat'), ('!pressed', 'flat')],
+            )
 
             # Primary button with accent
-            style.configure('Primary.TButton', background=self.colors['accent'], foreground='#FFFFFF', padding=(18, 10), relief='flat', font=self.fonts['button'])
-            style.map('Primary.TButton',
-                      background=[('active', self.colors['accent_hover']), ('pressed', self.colors['accent_active'])],
-                      relief=[('pressed', 'flat'), ('!pressed', 'flat')])
+            style.configure(
+                'Primary.TButton',
+                background=self.colors['accent'],
+                foreground='#FFFFFF',
+                padding=(20, 14),
+                relief='flat',
+                font=self.fonts['button'],
+                focuscolor=self.colors['accent'],
+                focusborderwidth=2,
+            )
+            style.map(
+                'Primary.TButton',
+                background=[('active', self.colors['accent_hover']), ('pressed', self.colors['accent_active'])],
+                relief=[('pressed', 'flat'), ('!pressed', 'flat')],
+            )
 
             # Selected mode button (distinct color)
-            style.configure('Selected.TButton', background=self.colors.get('selected', '#10B981'), foreground='#FFFFFF', padding=(14, 8), relief='flat', font=self.fonts['button'])
-            style.map('Selected.TButton',
-                      background=[('active', self.colors.get('selected_hover', '#059669')), ('pressed', self.colors.get('selected_active', '#047857'))],
-                      relief=[('pressed', 'flat'), ('!pressed', 'flat')])
+            style.configure(
+                'Selected.TButton',
+                background=self.colors.get('selected', '#10B981'),
+                foreground='#FFFFFF',
+                padding=(20, 14),
+                relief='flat',
+                font=self.fonts['button'],
+                focuscolor=self.colors['accent'],
+                focusborderwidth=2,
+            )
+            style.map(
+                'Selected.TButton',
+                background=[('active', self.colors.get('selected_hover', '#059669')), ('pressed', self.colors.get('selected_active', '#047857'))],
+                relief=[('pressed', 'flat'), ('!pressed', 'flat')],
+            )
 
             # Danger (light red) button
-            style.configure('Danger.TButton', background='#FCA5A5', foreground='#FFFFFF', padding=(14, 8), relief='flat', font=self.fonts['button'])
-            style.map('Danger.TButton',
-                      background=[('active', '#F87171'), ('pressed', '#EF4444')],
-                      relief=[('pressed', 'flat'), ('!pressed', 'flat')])
+            style.configure(
+                'Danger.TButton',
+                background='#FCA5A5',
+                foreground='#FFFFFF',
+                padding=(20, 14),
+                relief='flat',
+                font=self.fonts['button'],
+                focuscolor=self.colors['accent'],
+                focusborderwidth=2,
+            )
+            style.map(
+                'Danger.TButton',
+                background=[('active', '#F87171'), ('pressed', '#EF4444')],
+                relief=[('pressed', 'flat'), ('!pressed', 'flat')],
+            )
         except Exception:
             pass
 
@@ -296,21 +346,21 @@ class VoicesAutomationApp:
         grid.grid_columnconfigure(0, minsize=160)
         grid.grid_columnconfigure(1, minsize=160)
         # 2x2 grid of action buttons
-        self.invite_button = ttk.Button(grid, text="Invite to Job", command=lambda: self.show_input_fields("invite"))
+        self.invite_button = ttk.Button(grid, text="Invite to Job", command=lambda: self.show_input_fields("invite"), takefocus=True)
         self._style_button(self.invite_button, 'secondary')
         self.invite_button.grid(row=0, column=0, padx=self.spacing['inline'], pady=self.spacing['row'], sticky='w')
         self._Tooltip(
             self.invite_button,
             "Prepare fields to invite talents to a job. Open the job page in Voices first.",
         )
-        self.favorites_button = ttk.Button(grid, text="Add to Favorites", command=lambda: self.show_input_fields("favorites"))
+        self.favorites_button = ttk.Button(grid, text="Add to Favorites", command=lambda: self.show_input_fields("favorites"), takefocus=True)
         self._style_button(self.favorites_button, 'secondary')
         self.favorites_button.grid(row=0, column=1, padx=self.spacing['inline'], pady=self.spacing['row'], sticky='w')
         self._Tooltip(
             self.favorites_button,
             "Add talents to your Favorites list. Make sure a Voices talent page is loaded.",
         )
-        self.message_button = ttk.Button(grid, text="Message Talent", command=lambda: self.show_input_fields("message"))
+        self.message_button = ttk.Button(grid, text="Message Talent", command=lambda: self.show_input_fields("message"), takefocus=True)
         self._style_button(self.message_button, 'secondary')
         self.message_button.grid(row=1, column=0, padx=self.spacing['inline'], pady=self.spacing['row'], sticky='w')
         self._Tooltip(
@@ -318,7 +368,7 @@ class VoicesAutomationApp:
             "Compose and send a message to talents. Requires a Voices messaging page.",
         )
         # New: Import Invites (CSV of usernames)
-        self.import_button = ttk.Button(grid, text="Import Invites", command=lambda: self.show_input_fields("import_invites"))
+        self.import_button = ttk.Button(grid, text="Import Invites", command=lambda: self.show_input_fields("import_invites"), takefocus=True)
         self._style_button(self.import_button, 'secondary')
         self.import_button.grid(row=1, column=1, padx=self.spacing['inline'], pady=self.spacing['row'], sticky='w')
         self._Tooltip(
@@ -335,9 +385,9 @@ class VoicesAutomationApp:
         # Voices logo button on the right
         self.voices_logo_img = self._load_logo_image()
         if self.voices_logo_img is not None:
-            self.open_button_top = ttk.Button(action_frame, image=self.voices_logo_img, command=self.open_browser)
+            self.open_button_top = ttk.Button(action_frame, image=self.voices_logo_img, command=self.open_browser, takefocus=True)
         else:
-            self.open_button_top = ttk.Button(action_frame, text="Open Voices", command=self.open_browser)
+            self.open_button_top = ttk.Button(action_frame, text="Open Voices", command=self.open_browser, takefocus=True)
         self._style_button(self.open_button_top, 'secondary')
         self.open_button_top.pack(side=tk.RIGHT, padx=self.spacing['inline'])
         self._Tooltip(
@@ -413,7 +463,7 @@ class VoicesAutomationApp:
         transport.grid(row=2, column=0, sticky="ew")
 
         # Core transport controls: Run, Pause, Cancel
-        self.play_pause_button = ttk.Button(transport, text="▶ Start", command=self.play_pause)
+        self.play_pause_button = ttk.Button(transport, text="▶ Start", command=self.play_pause, takefocus=True)
         self._style_button(self.play_pause_button, 'primary')
         self.play_pause_button.pack(side=tk.LEFT, padx=self.spacing['inline'])
         self._Tooltip(
@@ -421,7 +471,7 @@ class VoicesAutomationApp:
             "Execute the selected action. Ensure required inputs and the Voices page are ready.",
         )
 
-        self.pause_button = ttk.Button(transport, text="⏸ Pause", state=tk.DISABLED, command=self.toggle_pause)
+        self.pause_button = ttk.Button(transport, text="⏸ Pause", state=tk.DISABLED, command=self.toggle_pause, takefocus=True)
         self._style_button(self.pause_button, 'secondary')
         self.pause_button.pack(side=tk.LEFT, padx=self.spacing['inline'])
         self._Tooltip(
@@ -429,7 +479,7 @@ class VoicesAutomationApp:
             "Temporarily halt the automation; click again to resume.",
         )
 
-        self.cancel_button = ttk.Button(transport, text="⏹ Cancel", state=tk.DISABLED, command=self.cancel_run)
+        self.cancel_button = ttk.Button(transport, text="⏹ Cancel", state=tk.DISABLED, command=self.cancel_run, takefocus=True)
         try:
             self.cancel_button.configure(style='Danger.TButton')
         except Exception:
@@ -458,7 +508,7 @@ class VoicesAutomationApp:
         lblrow.pack(side=tk.TOP, fill=tk.X)
         ttk.Label(lblrow, text="Slow").pack(side=tk.LEFT)
         ttk.Label(lblrow, text="Fast").pack(side=tk.RIGHT)
-        ttk.Scale(speed_row, from_=1.0, to=5.0, variable=self.speed_var, orient=tk.HORIZONTAL, length=180, command=_on_speed).pack(side=tk.TOP)
+        ttk.Scale(speed_row, from_=1.0, to=5.0, variable=self.speed_var, orient=tk.HORIZONTAL, length=180, command=_on_speed, takefocus=True).pack(side=tk.TOP)
 
         # Removed global Save Fields button; Save Message lives on Message tab
 
@@ -487,7 +537,7 @@ class VoicesAutomationApp:
             btn_row = ttk.Frame(self.input_frame)
             self._style_frame(btn_row, as_panel=True)
             btn_row.pack(fill=tk.X, pady=(6, 2))
-            save_msg_btn = ttk.Button(btn_row, text="💾 Save Message", command=self.save_fields)
+            save_msg_btn = ttk.Button(btn_row, text="💾 Save Message", command=self.save_fields, takefocus=True)
             save_msg_btn.pack(side=tk.LEFT)
             try:
                 save_msg_btn.config(text="Save Message")
@@ -503,6 +553,7 @@ class VoicesAutomationApp:
             panel.pack(fill=tk.BOTH, expand=True, pady=6)
             hint = ttk.Label(panel, text="Drop CSV here or click to select", anchor="center")
             hint.pack(fill=tk.BOTH, expand=True, padx=8, pady=16)
+            hint.configure(takefocus=True)
             def _browse_csv():
                 p = filedialog.askopenfilename(title="Select CSV", filetypes=[("CSV Files", "*.csv"), ("All Files", "*.*")])
                 if p:
@@ -553,20 +604,23 @@ class VoicesAutomationApp:
         self._style_frame(row_frame, as_panel=True)
         row_frame.pack(fill=tk.X, pady=2)
 
-        label = ttk.Label(row_frame, text=label_text, width=20, anchor="w")
+        label = ttk.Label(row_frame)
+        label.configure(text=label_text, anchor='w', width=20)
         label.pack(side=tk.LEFT, padx=5)
 
         if is_textarea:
-            text_widget = scrolledtext.ScrolledText(row_frame, height=5, width=50)
+            text_widget = scrolledtext.ScrolledText(row_frame, height=5, width=50, takefocus=True)
             self._style_text(text_widget)
             text_widget.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=5)
+            label['for'] = text_widget
             self.input_fields[var_name] = text_widget
         else:
-            entry = ttk.Entry(row_frame, width=50)
+            entry = ttk.Entry(row_frame, width=50, takefocus=True)
             entry.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=5)
+            label['for'] = entry
             self.input_fields[var_name] = entry
             if var_name == 'url':
-                open_btn = ttk.Button(row_frame, text="Open Voices", command=self.open_browser)
+                open_btn = ttk.Button(row_frame, text="Open Voices", command=self.open_browser, takefocus=True)
                 open_btn.pack(side=tk.LEFT, padx=8)
                 self._style_button(open_btn, 'secondary')
 
