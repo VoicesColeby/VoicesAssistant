@@ -387,9 +387,16 @@ class VoicesAutomationApp:
             self.console_container, wrap=tk.WORD, state=tk.DISABLED
         )
         try:
-            self.console_text.configure(bg="#FFFFFF", fg=self.colors["text"], font=self.fonts["mono"], relief=tk.FLAT, bd=1)
+            self.console_text.configure(
+                bg="#FFFFFF",
+                fg=self.colors["text"],
+                font=self.fonts["mono"],
+                relief=tk.FLAT,
+                bd=1,
+            )
         except Exception:
             pass
+        self.console_text.configure(takefocus=True)
         self.console_text.grid(row=0, column=0, sticky="nsew")
 
         # Progress bar for script execution
