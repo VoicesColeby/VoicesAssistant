@@ -779,6 +779,16 @@ class VoicesAutomationApp:
 
     ANSI_RE = re.compile(r"\x1B\[[0-?]*[ -/]*[@-~]")
 
+    def _supports_unicode(self) -> bool:
+        if getattr(self, "_unicode_supported", None) is None:
+            try:
+                f = tkfont.nametofont(self.console_text.cget("font"))
+                tests = ("✖", "✓", "⚠", "•")
+                self._unicode_supported = all(f.measure(ch) > 0 for ch in tests)
+            except Exception:
+                self._unicode_supported = False
+        return self._unicode_supported
+
     def _format_console_line(self, text: str) -> str:
         # Ensure str and basic normalization
         try:
@@ -801,16 +811,17 @@ class VoicesAutomationApp:
         s = s.replace("⏹", "Stop")
 
         # Replace our simple tags with clean status indicators
+        use_unicode = self._supports_unicode()
         if s.lstrip().startswith("[x]"):
-            s = s.replace("[x]", "✖", 1)
+            s = s.replace("[x]", "✖" if use_unicode else "ERR", 1)
         elif s.lstrip().startswith("[i]"):
-            # Promote known-success messages to ✓
+            # Promote known-success messages to ✓/OK
             if re.search(r"(?i)\b(saved|finished|opened|launched|canceled|paused|resumed)\b", s):
-                s = s.replace("[i]", "✓", 1)
+                s = s.replace("[i]", "✓" if use_unicode else "OK", 1)
             else:
-                s = s.replace("[i]", "•", 1)
+                s = s.replace("[i]", "•" if use_unicode else "INFO", 1)
         elif s.lstrip().startswith("[!]"):
-            s = s.replace("[!]", "⚠", 1)
+            s = s.replace("[!]", "⚠" if use_unicode else "WARN", 1)
 
         # Guarantee newline termination for consistent display
         if not s.endswith("\n"):
