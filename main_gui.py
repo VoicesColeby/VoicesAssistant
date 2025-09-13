@@ -296,6 +296,13 @@ class VoicesAutomationApp:
         self.import_button = ttk.Button(grid, text="Import Invites", width=20, command=lambda: self.show_input_fields("import_invites"))
         self._style_button(self.import_button, 'secondary')
         self.import_button.grid(row=1, column=1, padx=self.spacing['inline'], pady=6, sticky='w')
+        # Track mode buttons for highlight toggling
+        self.mode_buttons = {
+            'invite': self.invite_button,
+            'favorites': self.favorites_button,
+            'message': self.message_button,
+            'import_invites': self.import_button,
+        }
         # Voices logo button on the right
         self.voices_logo_img = self._load_logo_image()
         if self.voices_logo_img is not None:
@@ -443,6 +450,11 @@ class VoicesAutomationApp:
 
         self.input_fields = {}
         self.selected_action = action
+        # Highlight selected mode
+        try:
+            self.set_selected_mode(action)
+        except Exception:
+            pass
 
         # Create new fields based on the selected action
         # Per new flow: only Start URL is required for all actions.
@@ -509,6 +521,13 @@ class VoicesAutomationApp:
 
         # Prefill from saved values if available
         self.prefill_saved_fields()
+
+    def set_selected_mode(self, action: str):
+        for name, btn in (getattr(self, 'mode_buttons', {}) or {}).items():
+            try:
+                btn.configure(style=('Primary.TButton' if name == action else 'Secondary.TButton'))
+            except Exception:
+                pass
 
     def create_entry(self, label_text, var_name, is_textarea=False):
         row_frame = ttk.Frame(self.input_frame)
@@ -673,22 +692,12 @@ class VoicesAutomationApp:
                 s = 5.0
             # Generic SPEED for scripts that support it (e.g., add_to_favorites)
             env['SPEED'] = f"{s:.2f}"
-            # Pacing for invite_to_job
-            def ms(v):
-                try:
-                    return str(int(max(50, round(v / s))))
-                except Exception:
-                    return str(int(v))
-            env.setdefault('OPEN_DROPDOWN_MS', ms(900))
-            env.setdefault('OPEN_MODAL_MS', ms(900))
-            env.setdefault('AFTER_CHOICES_OPEN', ms(1200))
-            env.setdefault('AFTER_OPTION_CLICK', ms(1000))
-            env.setdefault('BEFORE_SUBMIT_MS', ms(1400))
-            env.setdefault('BETWEEN_STEPS_MS', ms(700))
-            env.setdefault('BETWEEN_INVITES_MS', ms(1800))
-            env.setdefault('BETWEEN_PAGES_MS', ms(2000))
-            # Pacing for message_talent
-            env.setdefault('BETWEEN_ACTIONS_MS', ms(3000))
+            # Live speed via SPEED_FILE (no per-script overrides here)
+            try:
+                self._write_speed_file(s)
+                env['SPEED_FILE'] = self.speed_file_path
+            except Exception:
+                pass
 
             # Run the script as a subprocess
             creationflags = 0

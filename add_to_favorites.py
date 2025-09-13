@@ -7,13 +7,14 @@ from playwright.async_api import async_playwright
 START_URL = os.getenv("START_URL", "https://www.voices.com/talents/search")
 CDP_URL = os.getenv("DEBUG_URL", "http://127.0.0.1:9222")
 SPEED = float(os.getenv("SPEED", "1.0"))
+SPEED_FILE = os.getenv("SPEED_FILE", "").strip()
 FIRST_HEART_DELAY_MS = int(os.getenv("FIRST_HEART_DELAY_MS", "30000"))  # unscaled
 MAX_PAGES = int(os.getenv("MAX_PAGES", "999"))
 
-# pacing
-BETWEEN_STEPS_MS = int(700 / SPEED)
-BETWEEN_FAVORITES_MS = int(1200 / SPEED)
-BETWEEN_PAGES_MS = int(1500 / SPEED)
+# pacing (base values; live speed scaling applied via r())
+BASE_BETWEEN_STEPS_MS = 700
+BASE_BETWEEN_FAVORITES_MS = 1200
+BASE_BETWEEN_PAGES_MS = 1500
 
 # selectors
 HEART_ICON = "button.add-to-favorites, i.fa-heart-o, i.fa-heart"  # adjust to match real markup
@@ -29,11 +30,29 @@ def ok(msg):   print(f"\x1b[32m[✔]\x1b[0m {msg}")
 def warn(msg): print(f"\x1b[33m[!]\x1b[0m {msg}")
 def err(msg):  print(f"\x1b[31m[×]\x1b[0m {msg}")
 
-# ============== Randomized pacing ==============
-def r(min_ms, max_ms): return random.uniform(min_ms/1000, max_ms/1000)
-async def step_pause(): await asyncio.sleep(r(BETWEEN_STEPS_MS, BETWEEN_STEPS_MS+400))
-async def fav_pause():  await asyncio.sleep(r(BETWEEN_FAVORITES_MS, BETWEEN_FAVORITES_MS+800))
-async def page_pause(): await asyncio.sleep(r(BETWEEN_PAGES_MS, BETWEEN_PAGES_MS+1000))
+# ============== Randomized pacing (live) ==============
+def _read_speed_file() -> float:
+    try:
+        if SPEED_FILE and os.path.exists(SPEED_FILE):
+            with open(SPEED_FILE, 'r', encoding='utf-8') as f:
+                v = float((f.read() or '5').strip())
+                return max(1.0, min(5.0, v))
+    except Exception:
+        pass
+    try:
+        return max(1.0, min(5.0, float(os.getenv("SPEED", str(SPEED)))))
+    except Exception:
+        return 5.0
+
+def r(min_ms, max_ms):
+    s = _read_speed_file()
+    lo = min_ms / s
+    hi = max_ms / s
+    return random.uniform(lo/1000, hi/1000)
+
+async def step_pause(): await asyncio.sleep(r(BASE_BETWEEN_STEPS_MS, BASE_BETWEEN_STEPS_MS+400))
+async def fav_pause():  await asyncio.sleep(r(BASE_BETWEEN_FAVORITES_MS, BASE_BETWEEN_FAVORITES_MS+800))
+async def page_pause(): await asyncio.sleep(r(BASE_BETWEEN_PAGES_MS, BASE_BETWEEN_PAGES_MS+1000))
 
 # ============== Core ==============
 async def click_heart_buttons(page):
