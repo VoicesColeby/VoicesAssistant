@@ -1,6 +1,7 @@
 import os
 import json
 import asyncio
+import random
 from typing import Optional
 
 from playwright.async_api import async_playwright, TimeoutError as PWTimeout
@@ -8,6 +9,26 @@ from playwright.async_api import async_playwright, TimeoutError as PWTimeout
 
 SEARCH_URL = "https://www.voices.com/talents/search?keywords=&language_ids=419&accent_id=114"
 DEFAULT_JOB_ID = "818318"
+
+CLICK_PAUSE = (
+    float(os.environ.get("VOICES_CLICK_PAUSE_MIN", 0.2)),
+    float(os.environ.get("VOICES_CLICK_PAUSE_MAX", 0.5)),
+)
+PAGE_PAUSE = (
+    float(os.environ.get("VOICES_PAGE_PAUSE_MIN", 1.0)),
+    float(os.environ.get("VOICES_PAGE_PAUSE_MAX", 1.0)),
+)
+
+
+async def jitter(a: float, b: float, label: str = "pause"):
+    delay = random.uniform(a, b)
+    log_event({"type": "delay", "label": label, "delay": delay})
+    try:
+        print(f"[delay] {label}: {delay:.2f}s")
+    except Exception:
+        pass
+    await asyncio.sleep(delay)
+    return delay
 
 
 async def open_existing_job_modal(page, index: int) -> Optional[object]:
@@ -64,7 +85,7 @@ async def select_job_in_modal(modal, job_id: str) -> bool:
     # First try: set the hidden <select> directly
     try:
         await modal.select_option('#request-quote-open-jobs-list', job_id)
-        await asyncio.sleep(0.15)
+        await jitter(0.15, 0.15, label="CLICK_PAUSE")
         # Verify chip reflects the choice
         chip_txt = await modal.locator('.choices__list--single .choices__item').first.inner_text()
         if f"#{job_id}" in (chip_txt or ""):
@@ -221,7 +242,7 @@ async def accept_cookies(page) -> None:
         btn = page.locator(":is(button,a,[role='button']):has-text('Accept'), :is(button,a,[role='button']):has-text('I agree'), :is(button,a,[role='button']):has-text('Got it')").first
         if await btn.count():
             await btn.click()
-            await asyncio.sleep(0.2)
+            await jitter(*CLICK_PAUSE, label="CLICK_PAUSE")
             log_event({"type": "cookies", "action": "accepted"})
     except Exception:
         pass
@@ -229,6 +250,11 @@ async def accept_cookies(page) -> None:
 
 async def run(job_id: str = DEFAULT_JOB_ID, start_url: str = SEARCH_URL, headless: bool = False, slow_mo: int = 60):
     async with async_playwright() as p:
+        log_event({"type": "delay", "label": "slow_mo", "delay": slow_mo / 1000})
+        try:
+            print(f"[delay] slow_mo: {slow_mo}ms")
+        except Exception:
+            pass
         browser = await p.chromium.launch(headless=headless, slow_mo=slow_mo)
         context = await browser.new_context(storage_state="voices_auth_state.json")
         page = await context.new_page()
@@ -254,9 +280,9 @@ async def run(job_id: str = DEFAULT_JOB_ID, start_url: str = SEARCH_URL, headles
                     break
                 # small scroll pulse to trigger lazy load
                 await page.mouse.wheel(0, 800)
-                await asyncio.sleep(1.0)
+                await jitter(*PAGE_PAUSE, label="PAGE_PAUSE")
             except Exception:
-                await asyncio.sleep(1.0)
+                await jitter(*PAGE_PAUSE, label="PAGE_PAUSE")
         if not found:
             log_event({"type": "exit", "reason": "no_buttons"})
             await context.close()
@@ -277,12 +303,12 @@ async def run(job_id: str = DEFAULT_JOB_ID, start_url: str = SEARCH_URL, headles
                     log_event({"type": "invite_open_failed", "idx": int(idx)})
                     idx += 1
                     continue
-                await asyncio.sleep(0.2)
+                await jitter(*CLICK_PAUSE, label="CLICK_PAUSE")
                 ok_sel = await select_job_in_modal(modal, job_id)
                 log_event({"type": "invite_select", "idx": int(idx), "selected": bool(ok_sel), "job_id": str(job_id)})
                 ok_conf = await confirm_invite(modal)
                 log_event({"type": "invite_confirm", "idx": int(idx), "confirmed": bool(ok_conf)})
-                await asyncio.sleep(0.5)
+                await jitter(*CLICK_PAUSE, label="CLICK_PAUSE")
             except Exception:
                 pass
             finally:
@@ -300,6 +326,25 @@ if __name__ == "__main__":
     ap.add_argument("--start-url", default=SEARCH_URL, help="Search page URL to process")
     ap.add_argument("--headless", action="store_true", help="Run headless")
     ap.add_argument("--slow-mo", type=int, default=60, help="Slow-mo ms between actions")
+    ap.add_argument("--click-pause-min", type=float, help="Minimum seconds for click jitter")
+    ap.add_argument("--click-pause-max", type=float, help="Maximum seconds for click jitter")
+    ap.add_argument("--page-pause-min", type=float, help="Minimum seconds between pages")
+    ap.add_argument("--page-pause-max", type=float, help="Maximum seconds between pages")
     args = ap.parse_args()
+    if args.click_pause_min is not None:
+        CLICK_PAUSE = (float(args.click_pause_min), CLICK_PAUSE[1])
+    if args.click_pause_max is not None:
+        CLICK_PAUSE = (CLICK_PAUSE[0], float(args.click_pause_max))
+    if args.page_pause_min is not None:
+        PAGE_PAUSE = (float(args.page_pause_min), PAGE_PAUSE[1])
+    if args.page_pause_max is not None:
+        PAGE_PAUSE = (PAGE_PAUSE[0], float(args.page_pause_max))
 
-    asyncio.run(run(job_id=str(args.job_id), start_url=args.start_url, headless=bool(args.headless), slow_mo=int(args.slow_mo)))
+    asyncio.run(
+        run(
+            job_id=str(args.job_id),
+            start_url=args.start_url,
+            headless=bool(args.headless),
+            slow_mo=int(args.slow_mo),
+        )
+    )
