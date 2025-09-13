@@ -136,6 +136,43 @@ async def select_job_in_modal(modal, job_id: str) -> bool:
     return False
 
 
+async def _click_with_logging(confirm, modal=None) -> bool:
+    """Attempt to click the confirmation element with fallbacks and logging."""
+    methods = [
+        ("normal", lambda: confirm.click()),
+        ("force", lambda: confirm.click(force=True)),
+        ("js", lambda: confirm.evaluate("el => el.click()")),
+        ("keyboard", lambda: (modal or confirm).press("Enter")),
+    ]
+    for name, action in methods:
+        try:
+            visible = await confirm.is_visible()
+        except Exception:
+            visible = None
+        try:
+            enabled = await confirm.is_enabled()
+        except Exception:
+            enabled = None
+        try:
+            bbox = await confirm.bounding_box()
+        except Exception:
+            bbox = None
+        log_event({"type": "confirm_attempt", "method": name, "visible": visible, "enabled": enabled, "bbox": bbox})
+        try:
+            await action()
+            log_event({"type": "confirm_summary", "method": name, "success": True})
+            return True
+        except Exception as e:
+            outer = None
+            try:
+                outer = await confirm.evaluate("el => el.outerHTML")
+            except Exception:
+                pass
+            log_event({"type": "confirm_error", "method": name, "error": str(e), "outer_html": outer})
+    log_event({"type": "confirm_summary", "method": "keyboard", "success": False})
+    return False
+
+
 async def confirm_invite(modal) -> bool:
     """Clicks the modal's primary Invite button and waits for the modal to close.
     Returns True if the modal closes, implying the action was sent/handled.
@@ -146,17 +183,10 @@ async def confirm_invite(modal) -> bool:
     except Exception:
         # As a fallback, try a generic primary button inside the modal
         confirm = modal.locator("button.btn.btn-primary").first
-    try:
-        await confirm.click()
-    except Exception:
-        # Try force click
-        try:
-            await confirm.click(force=True)
-        except Exception:
-            try:
-                await confirm.evaluate("el => el.click()")
-            except Exception:
-                return False
+
+    ok = await _click_with_logging(confirm, modal)
+    if not ok:
+        return False
 
     # Wait for the modal to close (success or already invited toast may appear)
     try:
