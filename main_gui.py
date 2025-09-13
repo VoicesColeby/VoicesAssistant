@@ -382,11 +382,11 @@ class VoicesAutomationApp:
         transport.pack(side=tk.BOTTOM, fill=tk.X)
 
         # Core transport controls: Run, Pause, Cancel
-        self.run_button = ttk.Button(transport, text="▶ Run Automation", width=24, command=self.run_automation)
-        self._style_button(self.run_button, 'primary')
-        self.run_button.pack(side=tk.LEFT, padx=self.spacing['inline'])
+        self.play_pause_button = ttk.Button(transport, text="▶ Start", width=24, command=self.play_pause)
+        self._style_button(self.play_pause_button, 'primary')
+        self.play_pause_button.pack(side=tk.LEFT, padx=self.spacing['inline'])
         self._Tooltip(
-            self.run_button,
+            self.play_pause_button,
             "Execute the selected action. Ensure required inputs and the Voices page are ready.",
         )
 
@@ -1042,7 +1042,7 @@ class VoicesAutomationApp:
     def apply_controls_state(self, running: bool):
         if running:
             try:
-                self.run_button.config(state=tk.DISABLED)
+                self.play_pause_button.config(state=tk.DISABLED)
             except Exception:
                 pass
             try:
@@ -1055,7 +1055,7 @@ class VoicesAutomationApp:
                 pass
         else:
             try:
-                self.run_button.config(state=tk.NORMAL)
+                self.play_pause_button.config(state=tk.NORMAL)
             except Exception:
                 pass
             try:
@@ -1070,11 +1070,11 @@ class VoicesAutomationApp:
 
     def set_controls_state(self, running: bool):
         if running:
-            self.run_button.config(state=tk.DISABLED)
+            self.play_pause_button.config(state=tk.DISABLED)
             self.pause_button.config(state=tk.NORMAL, text="⏸ Pause")
             self.cancel_button.config(state=tk.NORMAL)
         else:
-            self.run_button.config(state=tk.NORMAL)
+            self.play_pause_button.config(state=tk.NORMAL)
             self.pause_button.config(state=tk.DISABLED, text="⏸ Pause")
             self.cancel_button.config(state=tk.DISABLED)
             self.is_paused = False
@@ -1114,7 +1114,7 @@ class VoicesAutomationApp:
 
             # Ensure run and cancel buttons stay consistent while toggling
             try:
-                self.run_button.config(state=tk.DISABLED)
+                self.play_pause_button.config(state=tk.DISABLED)
             except Exception:
                 pass
             try:
