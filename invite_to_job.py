@@ -5,6 +5,7 @@ import asyncio
 import os
 import re
 import random
+import json
 from typing import Dict
 from playwright.async_api import async_playwright, Page, Locator, TimeoutError as PWTimeout
 
@@ -83,9 +84,26 @@ def ok(msg: str):    print(f"\x1b[32m[✔]\x1b[0m {msg}")
 def warn(msg: str):  print(f"\x1b[33m[!]\x1b[0m {msg}")
 def err(msg: str):   print(f"\x1b[31m[×]\x1b[0m {msg}")
 
-# ============== Humanization ==============
+# ============== Humanization (live speed support) ==============
+def _read_speed_file() -> float:
+    try:
+        path = os.getenv("SPEED_FILE", "").strip()
+        if path and os.path.exists(path):
+            with open(path, 'r', encoding='utf-8') as f:
+                v = float((f.read() or '5').strip())
+                return max(1.0, min(5.0, v))
+    except Exception:
+        pass
+    try:
+        return max(1.0, min(5.0, float(os.getenv("SPEED", "5.0"))))
+    except Exception:
+        return 5.0
+
 def r(min_ms: int, max_ms: int) -> float:
-    return random.uniform(min_ms/1000, max_ms/1000)
+    speed = _read_speed_file()
+    lo = min_ms / speed
+    hi = max_ms / speed
+    return random.uniform(lo/1000, hi/1000)
 
 async def step_pause():
     await asyncio.sleep(r(BETWEEN_STEPS_MS, BETWEEN_STEPS_MS + 400))

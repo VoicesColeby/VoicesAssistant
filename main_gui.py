@@ -13,6 +13,7 @@ import urllib.parse
 import webbrowser
 import math
 import re
+import time
 
 class VoicesAutomationApp:
     def __init__(self, master):
@@ -67,6 +68,56 @@ class VoicesAutomationApp:
         self.create_widgets()
         self.load_saved_fields()
         self.apply_saved_settings()
+
+    # Simple tooltip helper
+    class _Tooltip:
+        def __init__(self, widget, text):
+            self.widget = widget
+            self.text = text
+            self.tip = None
+            try:
+                widget.bind('<Enter>', self._show)
+                widget.bind('<Leave>', self._hide)
+            except Exception:
+                pass
+        def _show(self, _evt=None):
+            try:
+                if self.tip:
+                    return
+                x = self.widget.winfo_rootx() + 20
+                y = self.widget.winfo_rooty() + self.widget.winfo_height() + 10
+                self.tip = tk.Toplevel(self.widget)
+                self.tip.wm_overrideredirect(True)
+                self.tip.wm_geometry(f'+{x}+{y}')
+                lbl = ttk.Label(self.tip, text=self.text, background='#FFFFE0', relief=tk.SOLID, borderwidth=1)
+                lbl.pack(ipadx=6, ipady=3)
+            except Exception:
+                self.tip = None
+        def _hide(self, _evt=None):
+            try:
+                if self.tip:
+                    self.tip.destroy()
+                    self.tip = None
+            except Exception:
+                pass
+
+    @property
+    def speed_file_path(self) -> str:
+        try:
+            return os.path.join(os.path.dirname(os.path.abspath(__file__)), 'speed.cfg')
+        except Exception:
+            return 'speed.cfg'
+
+    def _write_speed_file(self, value: float = None):
+        try:
+            v = float(value) if value is not None else float(getattr(self, 'speed_var', tk.DoubleVar(value=5.0)).get())
+        except Exception:
+            v = 5.0
+        try:
+            with open(self.speed_file_path, 'w', encoding='utf-8') as f:
+                f.write(f"{v:.2f}")
+        except Exception:
+            pass
 
     def _init_theme(self):
         try:
