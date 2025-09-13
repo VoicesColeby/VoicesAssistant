@@ -1364,7 +1364,41 @@ async def pick_job_in_modal(page) -> bool:
         try:
             await page.wait_for_selector(FINAL_INVITE_BTN_ANY, timeout=6000)
         except PWTimeout:
-            log_event({"type": "modal_missing", "reason": "no_confirm_button", "url": page.url})
+            extra = {}
+            if DEBUG:
+                try:
+                    locs = page.locator(FINAL_INVITE_BTN_ANY)
+                    count = await locs.count()
+                    matches = []
+                    for i in range(count):
+                        btn = locs.nth(i)
+                        try:
+                            visible = await btn.is_visible()
+                        except Exception:
+                            visible = None
+                        try:
+                            enabled = await btn.is_enabled()
+                        except Exception:
+                            enabled = None
+                        matches.append({"visible": visible, "enabled": enabled})
+                    extra["matches"] = matches
+                except Exception:
+                    pass
+                ts = int(time.time() * 1000)
+                try:
+                    html_path = f"debug_modal_missing_{ts}.html"
+                    with open(html_path, "w", encoding="utf-8") as fh:
+                        fh.write(await page.content())
+                    extra["html_path"] = html_path
+                except Exception:
+                    pass
+                try:
+                    png_path = f"debug_modal_missing_{ts}.png"
+                    await page.screenshot(path=png_path)
+                    extra["screenshot"] = png_path
+                except Exception:
+                    pass
+            log_event({"type": "modal_missing", "reason": "no_confirm_button", "url": page.url, **extra})
             return False
 
     # Ensure focus stays inside the modal so scrolling doesn't move the background
