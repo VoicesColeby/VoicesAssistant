@@ -8,7 +8,7 @@ MESSAGE = os.getenv("MESSAGE", "").strip()
 CDP_URL = os.getenv("DEBUG_URL", "http://127.0.0.1:9222").strip()
 
 DEFAULT_TIMEOUT_MS = int(os.getenv("DEFAULT_TIMEOUT_MS", "15000"))
-INITIAL_DELAY_MS   = int(os.getenv("INITIAL_DELAY_MS", "30000"))
+INITIAL_DELAY_MS   = int(os.getenv("INITIAL_DELAY_MS", "0"))
 BETWEEN_STEPS_MS   = int(os.getenv("BETWEEN_STEPS_MS", "700"))
 BETWEEN_SENDS_MS   = int(os.getenv("BETWEEN_SENDS_MS", "1800"))
 BETWEEN_PAGES_MS   = int(os.getenv("BETWEEN_PAGES_MS", "2000"))
@@ -133,7 +133,7 @@ async def main():
             await page.goto(START_URL, wait_until="domcontentloaded")
 
         if INITIAL_DELAY_MS > 0:
-            info(f"Initial delay: {INITIAL_DELAY_MS} ms to let you adjust selections...")
+            # Initial delay disabled by default; use GUI pause when needed
             await asyncio.sleep(INITIAL_DELAY_MS / 1000.0)
 
         totals = {"seen": 0, "sent": 0, "skipped": 0}

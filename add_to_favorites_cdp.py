@@ -8,7 +8,7 @@ from playwright.async_api import async_playwright
 START_URL = os.getenv("START_URL", "").strip()          # optional; if empty, uses current tab
 CDP_URL = os.getenv("DEBUG_URL", "http://127.0.0.1:9222").strip()
 SPEED = float(os.getenv("SPEED", "1.0"))
-FIRST_HEART_DELAY_MS = int(os.getenv("FIRST_HEART_DELAY_MS", "30000"))  # unscaled
+FIRST_HEART_DELAY_MS = int(os.getenv("FIRST_HEART_DELAY_MS", "0"))  # unscaled, default off
 MAX_PAGES = int(os.getenv("MAX_PAGES", "999"))
 
 # pacing
@@ -112,7 +112,7 @@ async def main():
             await page.goto(START_URL, wait_until="domcontentloaded")
 
         if FIRST_HEART_DELAY_MS > 0:
-            info(f"Initial delay {FIRST_HEART_DELAY_MS}ms — select the favorites list if needed…")
+            # Initial delay disabled by default; use GUI pause when needed
             await asyncio.sleep(FIRST_HEART_DELAY_MS/1000)
 
         totals = {"seen": 0, "hearted": 0, "skipped": 0}

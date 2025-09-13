@@ -1,6 +1,6 @@
 
 import tkinter as tk
-from tkinter import scrolledtext, messagebox
+from tkinter import scrolledtext, messagebox, filedialog
 from tkinter import ttk
 import tkinter.font as tkfont
 import subprocess
@@ -585,45 +585,26 @@ class VoicesAutomationApp:
 
         elif action == "import_invites":
             self._import_csv_var = tk.StringVar(value="")
-            # Create a simple drop/select area
-            panel = ttk.Frame(self.input_frame)
-            self._style_frame(panel, as_panel=True)
-            panel.pack(fill=tk.BOTH, expand=True, pady=6)
-            hint = ttk.Label(panel, text="Drop CSV here or click to select", anchor="center")
-            hint.pack(fill=tk.BOTH, expand=True, padx=8, pady=16)
-            hint.configure(takefocus=True)
+            # Job # field (required to select correct job each time)
+            self.create_entry("Job #:", "job_query", is_textarea=False)
+
+            # Simple CSV picker row (Entry + Browse button)
+            picker_row = ttk.Frame(self.input_frame)
+            self._style_frame(picker_row, as_panel=True)
+            picker_row.pack(fill=tk.X, pady=6)
+            ttk.Label(picker_row, text="CSV File:").pack(side=tk.LEFT, padx=5)
+            csv_entry = ttk.Entry(picker_row, textvariable=self._import_csv_var, width=50)
+            csv_entry.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=5)
             def _browse_csv():
                 p = filedialog.askopenfilename(title="Select CSV", filetypes=[("CSV Files", "*.csv"), ("All Files", "*.*")])
                 if p:
                     try:
                         self._import_csv_var.set(p)
-                        hint.config(text=f"Selected: {os.path.basename(p)}")
                     except Exception:
                         pass
-            # Click to select
-            try:
-                hint.bind('<Button-1>', lambda e: _browse_csv())
-            except Exception:
-                pass
-            # Optional drag-and-drop support via tkinterdnd2 if available
-            try:
-                from tkinterdnd2 import DND_FILES  # type: ignore
-                def _on_drop(event):
-                    try:
-                        # event.data may contain one or more paths; take first
-                        raw = event.data.strip()
-                        if raw.startswith('{') and raw.endswith('}'):
-                            raw = raw[1:-1]
-                        path = raw.split()[0]
-                        if path:
-                            self._import_csv_var.set(path)
-                            hint.config(text=f"Selected: {os.path.basename(path)}")
-                    except Exception:
-                        pass
-                hint.drop_target_register(DND_FILES)
-                hint.dnd_bind('<<Drop>>', _on_drop)
-            except Exception:
-                pass
+            browse_btn = ttk.Button(picker_row, text="Browse…", command=_browse_csv, takefocus=True)
+            self._style_button(browse_btn, 'secondary')
+            browse_btn.pack(side=tk.LEFT, padx=6)
             # Immediately prompt for selection to streamline flow
             _browse_csv()
 
@@ -1058,6 +1039,18 @@ class VoicesAutomationApp:
 
         # We'll navigate explicitly; some scripts honor START_URL
         env['USE_CURRENT_PAGE'] = '0'
+        # Require job # so we select the correct job from the modal on every profile
+        job_val = ''
+        try:
+            w = self.input_fields.get('job_query')
+            if w and hasattr(w, 'get'):
+                job_val = (w.get() or '').strip()
+        except Exception:
+            job_val = ''
+        if not job_val:
+            messagebox.showwarning("Job # Required", "Enter the Job # to invite talents to. Example: 805775")
+            return
+        env['JOB_QUERY'] = job_val
 
         # Loop each username and invite via profile URL
         self._stop_import = False
@@ -1406,7 +1399,12 @@ class VoicesAutomationApp:
         return
 
 if __name__ == "__main__":
-    root = tk.Tk()
+    # Initialize root with TkinterDnD if available for drag-and-drop
+    try:
+        from tkinterdnd2 import TkinterDnD  # type: ignore
+        root = TkinterDnD.Tk()
+    except Exception:
+        root = tk.Tk()
     app = VoicesAutomationApp(root)
     root.mainloop()
 

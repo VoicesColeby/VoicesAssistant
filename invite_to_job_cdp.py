@@ -11,14 +11,24 @@ JOB_QUERY = os.getenv("JOB_QUERY", "").strip()
 CDP_URL   = os.getenv("DEBUG_URL", "http://127.0.0.1:9222").strip()
 
 DEFAULT_TIMEOUT_MS = int(os.getenv("DEFAULT_TIMEOUT_MS", "15000"))
-INITIAL_DELAY_MS   = int(os.getenv("INITIAL_DELAY_MS", "30000"))
+# Removed initial wait; pause is handled via GUI now
+INITIAL_DELAY_MS   = int(os.getenv("INITIAL_DELAY_MS", "0"))
 BETWEEN_STEPS_MS   = int(os.getenv("BETWEEN_STEPS_MS", "700"))
 BETWEEN_INVITES_MS = int(os.getenv("BETWEEN_INVITES_MS", "1800"))
 BETWEEN_PAGES_MS   = int(os.getenv("BETWEEN_PAGES_MS", "2000"))
 MAX_PAGES          = int(os.getenv("MAX_PAGES", "999"))
 
 # Selectors
+# Search/list card invite button (caret dropdown)
 INVITE_BUTTON_WITH_DROPDOWN = "button.headbtn.btn.btn-primary:has(i.fa-caret-down)"
+# Profile header invite button (top-right on talent profile)
+PROFILE_INVITE_BUTTON = ", ".join([
+    "button.profile-header-btn.headbtn.btn.btn-primary",
+    "button.headbtn.btn.btn-primary.profile-header-btn",
+    "button.btn.btn-primary.profile-header-btn",
+    "button:has-text('Invite to Job')",
+    "button:has-text('Invite to job')",
+])
 DROPDOWN_MENU = ".dropdown-content, .downmenu .dropdown-content"
 INVITE_EXISTING_BTN = "button.request_a_quote_btn:has-text('Invite to Existing Job')"
 
@@ -128,15 +138,44 @@ async def select_job_in_modal(page: Page, job_query: Optional[str]) -> bool:
         await inner.click()
         await asyncio.sleep(0.25)
     except Exception:
-        warn("Choices.js dropdown not found; falling back to native select")
-        return True
+        warn("Choices.js dropdown not found; trying native select fallback")
+        if job_id:
+            _ok = await page.evaluate(
+                """(sel, val) => {
+                    const el = document.querySelector(sel);
+                    if (!el) return false;
+                    el.value = String(val);
+                    el.dispatchEvent(new Event('change', {bubbles:true}));
+                    return true;
+                }""",
+                NATIVE_SELECT,
+                job_id,
+            )
+            if _ok:
+                await asyncio.sleep(0.3)
+                return await verify_selected(page, job_id)
+        return False
     if not job_id:
         warn("No job_id parsed; cannot select via Choices")
         return False
     if await js_click_option(page, job_id):
         await asyncio.sleep(0.3)
         return await verify_selected(page, job_id)
-    warn("JS click on option failed; trying native verify")
+    warn("JS click on option failed; trying native set + verify")
+    _ok = await page.evaluate(
+        """(sel, val) => {
+            const el = document.querySelector(sel);
+            if (!el) return false;
+            el.value = String(val);
+            el.dispatchEvent(new Event('change', {bubbles:true}));
+            return true;
+        }""",
+        NATIVE_SELECT,
+        job_id,
+    )
+    if _ok:
+        await asyncio.sleep(0.3)
+        return await verify_selected(page, job_id)
     return await verify_selected(page, job_id)
 
 async def close_modal(page: Page):
@@ -207,12 +246,69 @@ async def invite_single_talent(page: Page, invite_button: Locator, job_query: Op
     await close_modal(page)
     return result
 
+async def invite_via_profile_header(page: Page, job_query: Optional[str]) -> str:
+    """Handle inviting from a single talent profile page (top-right button)."""
+    try:
+        btn = page.locator(PROFILE_INVITE_BUTTON).first
+        if await btn.count() == 0:
+            warn("Profile header invite button not found")
+            return 'skipped'
+        await btn.scroll_into_view_if_needed()
+        await asyncio.sleep(0.2)
+        await btn.click()
+    except Exception as e:
+        warn(f"Failed to click profile invite button: {e}")
+        return 'skipped'
+
+    try:
+        menu = page.locator(DROPDOWN_MENU).first
+        await menu.wait_for(state="visible", timeout=DEFAULT_TIMEOUT_MS)
+        btn2 = page.locator(INVITE_EXISTING_BTN).first
+        await btn2.click()
+    except Exception as e:
+        warn(f"Profile dropdown interaction failed: {e}")
+        return 'skipped'
+
+    try:
+        await page.locator(MODAL_VISIBLE).first.wait_for(state="visible", timeout=DEFAULT_TIMEOUT_MS)
+        await step_pause()
+    except Exception:
+        warn("Modal did not appear in time")
+        return 'skipped'
+
+    if not await select_job_in_modal(page, job_query):
+        warn("Job selection failed")
+        await close_modal(page)
+        return 'skipped'
+
+    await step_pause()
+    submit_btn = page.locator(MODAL_SUBMIT_BTN).first
+    await asyncio.sleep(1.0)
+    if not await safe_click(submit_btn, timeout=8000):
+        warn("Could not click submit button")
+        await close_modal(page)
+        return 'skipped'
+    await asyncio.sleep(1.0)
+    result = await check_invitation_result(page)
+    await close_modal(page)
+    return result
+
 async def process_current_page(page: Page, job_query: Optional[str]) -> Dict[str, int]:
     stats = {"seen": 0, "invited": 0, "already": 0, "skipped": 0, "failed": 0}
     invite_buttons = page.locator(INVITE_BUTTON_WITH_DROPDOWN)
     count = await invite_buttons.count()
     if count == 0:
-        warn("No invite buttons found on this page")
+        # Fallback: handle talent profile page with a single header button
+        result = await invite_via_profile_header(page, job_query)
+        stats["seen"] = 1
+        if result == 'success':
+            stats["invited"] += 1
+        elif result == 'already':
+            stats["already"] += 1
+        elif result == 'skipped':
+            stats["skipped"] += 1
+        else:
+            stats["failed"] += 1
         return stats
     stats["seen"] = count
     info(f"Found {count} talent cards to process")
@@ -273,9 +369,7 @@ async def main():
         if START_URL:
             await page.goto(START_URL, wait_until="domcontentloaded")
 
-        if INITIAL_DELAY_MS > 0:
-            info(f"Initial delay: {INITIAL_DELAY_MS} ms to let you prepare the UI (choose job/list/etc.)…")
-            await asyncio.sleep(INITIAL_DELAY_MS / 1000.0)
+        # Removed initial delay; use GUI pause instead
 
         totals = {"seen": 0, "invited": 0, "already": 0, "skipped": 0, "failed": 0}
         page_num = 1
