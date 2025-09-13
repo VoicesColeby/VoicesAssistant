@@ -656,6 +656,42 @@ async def accept_cookies_if_present(page):
     except Exception:
         pass
 
+async def _click_with_logging(confirm, modal=None) -> bool:
+    """Attempt to click the confirmation element with fallbacks and logging."""
+    methods = [
+        ("normal", lambda: confirm.click()),
+        ("force", lambda: confirm.click(force=True)),
+        ("js", lambda: confirm.evaluate("el => el.click()")),
+        ("keyboard", lambda: (modal or confirm).press("Enter")),
+    ]
+    for name, action in methods:
+        try:
+            visible = await confirm.is_visible()
+        except Exception:
+            visible = None
+        try:
+            enabled = await confirm.is_enabled()
+        except Exception:
+            enabled = None
+        try:
+            bbox = await confirm.bounding_box()
+        except Exception:
+            bbox = None
+        log_event({"type": "confirm_attempt", "method": name, "visible": visible, "enabled": enabled, "bbox": bbox})
+        try:
+            await action()
+            log_event({"type": "confirm_summary", "method": name, "success": True})
+            return True
+        except Exception as e:
+            outer = None
+            try:
+                outer = await confirm.evaluate("el => el.outerHTML")
+            except Exception:
+                pass
+            log_event({"type": "confirm_error", "method": name, "error": str(e), "outer_html": outer})
+    log_event({"type": "confirm_summary", "method": "keyboard", "success": False})
+    return False
+
 async def _click_existing_job_dropdown(page, head_btn) -> bool:
     """After clicking the head 'Invite to Job' button on a card, click the
     dropdown item 'Invite to Existing Job' as reliably as possible.
@@ -1429,9 +1465,8 @@ async def pick_job_in_modal(page) -> bool:
             if DRY_RUN:
                 log_event({"type": "would_click", "target": "confirm_primary", "selector": "#submit-request-quote"})
                 return True
-            try:
-                await confirm0.click()
-            except asyncio.CancelledError:
+            ok = await _click_with_logging(confirm0, modal if have_modal else None)
+            if not ok:
                 return False
             try:
                 await page.wait_for_selector(SUCCESS_TOAST, timeout=6000)
@@ -1578,7 +1613,9 @@ async def pick_job_in_modal(page) -> bool:
                             if DRY_RUN:
                                 log_event({"type": "would_click", "target": "confirm_after_row_click"})
                                 return True
-                            await confirm.click()
+                            ok = await _click_with_logging(confirm, modal if have_modal else None)
+                            if not ok:
+                                return False
                             try:
                                 await page.wait_for_selector(SUCCESS_TOAST, timeout=6000)
                             except PWTimeout:
@@ -1632,32 +1669,8 @@ async def pick_job_in_modal(page) -> bool:
                 if DRY_RUN:
                     log_event({"type": "would_click", "target": "confirm_after_choices"})
                     return True
-
-                # Try normal click, then force, then JS
-                clicked = False
-                try:
-                    await confirm.click()
-                    clicked = True
-                except Exception:
-                    try:
-                        await confirm.click(force=True)
-                        clicked = True
-                    except Exception:
-                        try:
-                            await confirm.evaluate("el => el.click()")
-                            clicked = True
-                        except Exception:
-                            clicked = False
-
-                if not clicked:
-                    # Last resort: press Enter to submit
-                    try:
-                        await modal.press("Enter")
-                        clicked = True
-                    except Exception:
-                        pass
-
-                if not clicked:
+                ok = await _click_with_logging(confirm, modal if have_modal else None)
+                if not ok:
                     return False
 
                 # Wait for success toast or modal to close
@@ -1717,17 +1730,9 @@ async def pick_job_in_modal(page) -> bool:
             if DRY_RUN:
                 log_event({"type": "would_click", "target": "confirm_fallback", "selector": "modal-scoped"})
                 return True
-            # Try click with fallbacks
-            try:
-                await confirm.click()
-            except Exception:
-                try:
-                    await confirm.click(force=True)
-                except Exception:
-                    try:
-                        await confirm.evaluate("el => el.click()")
-                    except Exception:
-                        return False
+            ok = await _click_with_logging(confirm, modal if have_modal else None)
+            if not ok:
+                return False
             try:
                 log_event({"type": "confirm_clicked", "path": "fallback_confirm"})
             except Exception:
@@ -1790,9 +1795,8 @@ async def pick_job_in_modal(page) -> bool:
                     if DRY_RUN:
                         log_event({"type": "would_click", "target": "confirm_after_row_select"})
                         return True
-                    try:
-                        await confirm.click()
-                    except asyncio.CancelledError:
+                    ok = await _click_with_logging(confirm, modal if have_modal else None)
+                    if not ok:
                         return False
                     try:
                         await page.wait_for_selector(SUCCESS_TOAST, timeout=6000)
@@ -1838,14 +1842,15 @@ async def pick_job_in_modal(page) -> bool:
         try:
             confirm = await page.query_selector(FINAL_INVITE_BTN)
             if confirm and await confirm.is_enabled():
-                await confirm.click()
-                try:
-                    await page.wait_for_selector(SUCCESS_TOAST, timeout=6000)
-                except PWTimeout:
+                ok = await _click_with_logging(confirm, modal if have_modal else None)
+                if ok:
                     try:
-                        await page.wait_for_selector(INVITE_MODAL, state="hidden", timeout=3000)
-                    except Exception:
-                        pass
+                        await page.wait_for_selector(SUCCESS_TOAST, timeout=6000)
+                    except PWTimeout:
+                        try:
+                            await page.wait_for_selector(INVITE_MODAL, state="hidden", timeout=3000)
+                        except Exception:
+                            pass
         except Exception:
             pass
     # close modal (some UIs auto-close)
