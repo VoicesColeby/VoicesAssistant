@@ -22,7 +22,7 @@ USE_CURRENT = os.getenv("USE_CURRENT_PAGE", "1").strip().lower() in ("1", "true"
 # Toggle actual sending (set to "false" to dry-run: open, type, close without sending)
 SEND_ENABLED = os.getenv("SEND_ENABLED", "true").lower() == "true"
 
-# Timeouts & pacing
+# Timeouts & pacing (base values)
 DEFAULT_TIMEOUT_MS   = int(os.getenv("DEFAULT_TIMEOUT_MS", "60000"))
 BETWEEN_STEPS_MS     = int(os.getenv("BETWEEN_STEPS_MS", "700"))     # minor step delay
 BETWEEN_ACTIONS_MS   = int(os.getenv("BETWEEN_ACTIONS_MS", "3000"))   # main per-talent delay (slower)
@@ -31,6 +31,28 @@ LONG_PAUSE_EVERY     = int(os.getenv("LONG_PAUSE_EVERY", "75"))       # pause ev
 LONG_PAUSE_MIN_MS    = int(os.getenv("LONG_PAUSE_MIN_MS", "60000"))   # 60s
 LONG_PAUSE_MAX_MS    = int(os.getenv("LONG_PAUSE_MAX_MS", "120000"))  # 120s
 
+# =======================
+# Live speed support
+# =======================
+def _read_speed_file() -> float:
+    try:
+        path = os.getenv("SPEED_FILE", "").strip()
+        if path and os.path.exists(path):
+            with open(path, 'r', encoding='utf-8') as f:
+                v = float((f.read() or '5').strip())
+                return max(1.0, min(5.0, v))
+    except Exception:
+        pass
+    try:
+        return max(1.0, min(5.0, float(os.getenv("SPEED", "5.0"))))
+    except Exception:
+        return 5.0
+
+def r(min_ms: int, max_ms: int) -> float:
+    speed = _read_speed_file()
+    lo = min_ms / speed
+    hi = max_ms / speed
+    return random.uniform(lo/1000, hi/1000)
 # =======================
 # Selectors
 # =======================
@@ -337,3 +359,4 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
