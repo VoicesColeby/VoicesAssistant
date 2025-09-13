@@ -283,10 +283,14 @@ class VoicesAutomationApp:
             pass
 
     def create_widgets(self):
+        self.master.grid_rowconfigure(0, weight=0)
+        self.master.grid_rowconfigure(1, weight=1)
+        self.master.grid_rowconfigure(2, weight=0)
+        self.master.grid_columnconfigure(0, weight=1)
         # Action Buttons Frame
         action_frame = ttk.Frame(self.master, padding=(12, self.spacing['section'], 12, 0))
         self._style_frame(action_frame)
-        action_frame.pack(fill=tk.X)
+        action_frame.grid(row=0, column=0, sticky="ew")
         grid = ttk.Frame(action_frame)
         grid.pack(side=tk.LEFT)
         # 2x2 grid of action buttons
@@ -341,15 +345,22 @@ class VoicesAutomationApp:
 
         # Content area: left (inputs) and right (console)
         content = ttk.Frame(self.master, padding=(12, self.spacing['section']))
-        content.pack(fill=tk.BOTH, expand=True)
+        content.grid(row=1, column=0, sticky="nsew")
+        content.grid_rowconfigure(0, weight=1)
+        content.grid_columnconfigure(0, weight=1)
+        content.grid_columnconfigure(1, weight=1)
         left_col = ttk.Frame(content)
-        left_col.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        left_col.grid(row=0, column=0, sticky="nsew")
+        left_col.grid_rowconfigure(0, weight=1)
+        left_col.grid_columnconfigure(0, weight=1)
         right_col = ttk.Frame(content)
-        right_col.pack(side=tk.RIGHT, fill=tk.Y)
+        right_col.grid(row=0, column=1, sticky="nsew")
+        right_col.grid_rowconfigure(0, weight=1)
+        right_col.grid_columnconfigure(0, weight=1)
         # Input Fields Frame in right column (console on the left)
         self.input_frame = ttk.Frame(right_col, padding=(0, 0))
         self._style_frame(self.input_frame, as_panel=True)
-        self.input_frame.pack(fill=tk.BOTH, expand=True)
+        self.input_frame.grid(row=0, column=0, sticky="nsew")
 
         # (settings row removed; controls moved to transport area)
 
@@ -359,28 +370,38 @@ class VoicesAutomationApp:
             self.console_frame.configure()
         except Exception:
             pass
-        # Fix console size: about half width and a bit less tall
-        self.console_frame.pack(padx=8, pady=(self.spacing['section']//2, self.spacing['section']//2), side=tk.LEFT)
-        self.console_container = ttk.Frame(self.console_frame, width=320, height=210)
-        self.console_container.pack(fill=tk.BOTH, expand=False)
-        self.console_container.pack_propagate(False)
-        self.console_text = scrolledtext.ScrolledText(self.console_container, wrap=tk.WORD, state=tk.DISABLED, height=12, width=38)
+        self.console_frame.grid(
+            row=0,
+            column=0,
+            padx=8,
+            pady=(self.spacing['section'] // 2, self.spacing['section'] // 2),
+            sticky="nsew",
+        )
+        self.console_frame.grid_rowconfigure(0, weight=1)
+        self.console_frame.grid_columnconfigure(0, weight=1)
+        self.console_container = ttk.Frame(self.console_frame)
+        self.console_container.grid(row=0, column=0, sticky="nsew")
+        self.console_container.grid_rowconfigure(0, weight=1)
+        self.console_container.grid_columnconfigure(0, weight=1)
+        self.console_text = scrolledtext.ScrolledText(
+            self.console_container, wrap=tk.WORD, state=tk.DISABLED
+        )
         try:
-            self.console_text.configure(bg='#FFFFFF', fg=self.colors['text'], font=self.fonts['mono'], relief=tk.FLAT, bd=1)
+            self.console_text.configure(bg="#FFFFFF", fg=self.colors["text"], font=self.fonts["mono"], relief=tk.FLAT, bd=1)
         except Exception:
             pass
-        self.console_text.pack(fill=tk.BOTH, expand=True)
+        self.console_text.grid(row=0, column=0, sticky="nsew")
 
         # Progress bar for script execution
         self.progress_bar = ttk.Progressbar(
-            self.console_frame, orient=tk.HORIZONTAL, mode='determinate', maximum=1
+            self.console_frame, orient=tk.HORIZONTAL, mode="determinate", maximum=1
         )
-        self.progress_bar.pack(fill=tk.X, pady=(self.spacing['row'], 0))
+        self.progress_bar.grid(row=1, column=0, sticky="ew", pady=(self.spacing["row"], 0))
 
         # Transport Controls at bottom
         transport = ttk.Frame(self.master, padding=(12, self.spacing['section'], 12, self.spacing['section']))
         self._style_frame(transport)
-        transport.pack(side=tk.BOTTOM, fill=tk.X)
+        transport.grid(row=2, column=0, sticky="ew")
 
         # Core transport controls: Run, Pause, Cancel
         self.play_pause_button = ttk.Button(transport, text="▶ Start", width=24, command=self.play_pause)
