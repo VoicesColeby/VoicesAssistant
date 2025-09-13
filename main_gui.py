@@ -28,7 +28,7 @@ class VoicesAutomationApp:
 
         # --- Theme: colors and fonts ---
         self.colors = {
-            'bg': '#F3F4F6',
+            'bg': '#F0F0F0',
             'panel': '#FFFFFF',
             'text': '#111827',
             'muted': '#6B7280',
@@ -122,6 +122,8 @@ class VoicesAutomationApp:
 
     def _init_theme(self):
         try:
+            # Neutral overall background
+            self.colors['bg'] = '#F0F0F0'
             self.master.configure(bg=self.colors['bg'])
             # Set sensible defaults
             self.master.option_add('*Font', self.fonts['body'])
@@ -139,7 +141,9 @@ class VoicesAutomationApp:
 
             # Base styles
             style.configure('TFrame', background=self.colors['bg'])
-            style.configure('TLabelframe', background=self.colors['panel'], foreground=self.colors['text'])
+            # Light relief/shadow for panels and labelframes
+            style.configure('Panel.TFrame', background=self.colors['panel'], relief='groove', borderwidth=1)
+            style.configure('TLabelframe', background=self.colors['panel'], foreground=self.colors['text'], relief='groove', borderwidth=1)
             style.configure('TLabelframe.Label', background=self.colors['panel'], foreground=self.colors['text'], font=self.fonts['heading'])
             style.configure('TLabel', background=self.colors['bg'], foreground=self.colors['text'])
             style.configure('TCheckbutton', background=self.colors['bg'], foreground=self.colors['text'], padding=6)
@@ -258,7 +262,16 @@ class VoicesAutomationApp:
 
     def _style_frame(self, frame, as_panel=False):
         try:
-            frame.configure(bg=(self.colors['panel'] if as_panel else self.colors['bg']))
+            if as_panel:
+                try:
+                    frame.configure(style='Panel.TFrame')
+                except Exception:
+                    pass
+            else:
+                try:
+                    frame.configure(style='TFrame')
+                except Exception:
+                    pass
         except Exception:
             pass
 
@@ -342,27 +355,29 @@ class VoicesAutomationApp:
         self._style_frame(action_frame)
         action_frame.grid(row=0, column=0, sticky="ew")
         grid = ttk.Frame(action_frame)
-        grid.pack(side=tk.LEFT)
-        grid.grid_columnconfigure(0, minsize=160)
-        grid.grid_columnconfigure(1, minsize=160)
+        grid.pack(side=tk.LEFT, expand=True, fill='x')
+        grid.grid_columnconfigure(0, weight=1, uniform='actions')
+        grid.grid_columnconfigure(1, weight=1, uniform='actions')
+        grid.grid_rowconfigure(0, weight=1)
+        grid.grid_rowconfigure(1, weight=1)
         # 2x2 grid of action buttons
-        self.invite_button = ttk.Button(grid, text="Invite to Job", command=lambda: self.show_input_fields("invite"), takefocus=True)
+        self.invite_button = ttk.Button(grid, text="Invite", command=lambda: self.show_input_fields("invite"), takefocus=True)
         self._style_button(self.invite_button, 'secondary')
-        self.invite_button.grid(row=0, column=0, padx=self.spacing['inline'], pady=self.spacing['row'], sticky='w')
+        self.invite_button.grid(row=0, column=0, padx=self.spacing['inline'], pady=self.spacing['row'], sticky='nsew')
         self._Tooltip(
             self.invite_button,
             "Prepare fields to invite talents to a job. Open the job page in Voices first.",
         )
-        self.favorites_button = ttk.Button(grid, text="Add to Favorites", command=lambda: self.show_input_fields("favorites"), takefocus=True)
+        self.favorites_button = ttk.Button(grid, text="Favorites", command=lambda: self.show_input_fields("favorites"), takefocus=True)
         self._style_button(self.favorites_button, 'secondary')
-        self.favorites_button.grid(row=0, column=1, padx=self.spacing['inline'], pady=self.spacing['row'], sticky='w')
+        self.favorites_button.grid(row=0, column=1, padx=self.spacing['inline'], pady=self.spacing['row'], sticky='nsew')
         self._Tooltip(
             self.favorites_button,
             "Add talents to your Favorites list. Make sure a Voices talent page is loaded.",
         )
-        self.message_button = ttk.Button(grid, text="Message Talent", command=lambda: self.show_input_fields("message"), takefocus=True)
+        self.message_button = ttk.Button(grid, text="Message", command=lambda: self.show_input_fields("message"), takefocus=True)
         self._style_button(self.message_button, 'secondary')
-        self.message_button.grid(row=1, column=0, padx=self.spacing['inline'], pady=self.spacing['row'], sticky='w')
+        self.message_button.grid(row=1, column=0, padx=self.spacing['inline'], pady=self.spacing['row'], sticky='nsew')
         self._Tooltip(
             self.message_button,
             "Compose and send a message to talents. Requires a Voices messaging page.",
@@ -370,7 +385,7 @@ class VoicesAutomationApp:
         # New: Import Invites (CSV of usernames)
         self.import_button = ttk.Button(grid, text="Import Invites", command=lambda: self.show_input_fields("import_invites"), takefocus=True)
         self._style_button(self.import_button, 'secondary')
-        self.import_button.grid(row=1, column=1, padx=self.spacing['inline'], pady=self.spacing['row'], sticky='w')
+        self.import_button.grid(row=1, column=1, padx=self.spacing['inline'], pady=self.spacing['row'], sticky='nsew')
         self._Tooltip(
             self.import_button,
             "Bulk invite talents from a CSV of usernames. Select the file before running.",
