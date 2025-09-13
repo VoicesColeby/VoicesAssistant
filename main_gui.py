@@ -156,6 +156,12 @@ class VoicesAutomationApp:
                       background=[('active', self.colors['accent_hover']), ('pressed', self.colors['accent_active'])],
                       relief=[('pressed', 'flat'), ('!pressed', 'flat')])
 
+            # Selected mode button (distinct color)
+            style.configure('Selected.TButton', background=self.colors.get('selected', '#10B981'), foreground='#FFFFFF', padding=(14, 8), relief='flat', font=self.fonts['button'])
+            style.map('Selected.TButton',
+                      background=[('active', self.colors.get('selected_hover', '#059669')), ('pressed', self.colors.get('selected_active', '#047857'))],
+                      relief=[('pressed', 'flat'), ('!pressed', 'flat')])
+
             # Danger (light red) button
             style.configure('Danger.TButton', background='#FCA5A5', foreground='#FFFFFF', padding=(14, 8), relief='flat', font=self.fonts['button'])
             style.map('Danger.TButton',
@@ -507,7 +513,7 @@ class VoicesAutomationApp:
     def set_selected_mode(self, action: str):
         for name, btn in (getattr(self, 'mode_buttons', {}) or {}).items():
             try:
-                btn.configure(style=('Primary.TButton' if name == action else 'Secondary.TButton'))
+                btn.configure(style=('Selected.TButton' if name == action else 'Secondary.TButton'))
             except Exception:
                 pass
 
