@@ -1,0 +1,13 @@
+# Runtime and temp artifacts
+voices_debug_profile/
+_dump_*.txt
+_head.txt
+_mid.txt
+patch_context.txt
+temp_segment.txt
+*.pyc
+__pycache__/
+*.log
+*.DS_Store
+Thumbs.db
+gui_state.json

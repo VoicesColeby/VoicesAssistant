@@ -1,296 +1,166 @@
-# add_to_favorites.py
 import asyncio
 import os
-import re
 import random
-from typing import Dict
-from playwright.async_api import async_playwright, Page, Locator, TimeoutError as PWTimeout
+from playwright.async_api import async_playwright
 
-# =======================
-# Config (env-overridable)
-# =======================
-START_URL = os.getenv("START_URL", "https://YOUR_TALENT_RESULTS_URL")
-FAVORITE_LIST_NAME = os.getenv("FAVORITE_LIST_NAME", "My Favorites")
+# ================== Config ==================
+START_URL = os.getenv("START_URL", "https://www.voices.com/talents/search")
 CDP_URL = os.getenv("DEBUG_URL", "http://127.0.0.1:9222")
-
-# Timeouts & pacing
-DEFAULT_TIMEOUT_MS = int(os.getenv("DEFAULT_TIMEOUT_MS", "12000"))
-BETWEEN_STEPS_MS = int(os.getenv("BETWEEN_STEPS_MS", "600"))
-BETWEEN_ACTIONS_MS = int(os.getenv("BETWEEN_ACTIONS_MS", "1200"))
-BETWEEN_PAGES_MS = int(os.getenv("BETWEEN_PAGES_MS", "1500"))
+SPEED = float(os.getenv("SPEED", "1.0"))
+FIRST_HEART_DELAY_MS = int(os.getenv("FIRST_HEART_DELAY_MS", "30000"))  # unscaled
 MAX_PAGES = int(os.getenv("MAX_PAGES", "999"))
 
-# =======================
-# Selectors
-# =======================
+# pacing
+BETWEEN_STEPS_MS = int(700 / SPEED)
+BETWEEN_FAVORITES_MS = int(1200 / SPEED)
+BETWEEN_PAGES_MS = int(1500 / SPEED)
 
-# Heart icon
-HEART_ICON = "i.action-list-btn.fa-heart.fa-lg"
-
-# Favorites dropdown menu container
-FAVORITES_DROPDOWN = "div.action-list-dropdown"
-
-# Favorite list button inside the dropdown
-FAVORITE_LIST_BTN_BASE = "button.action-list-checkbox-btn:has-text('{}')"
-
-# Pagination
+# selectors
+HEART_ICON = "button.add-to-favorites, i.fa-heart-o, i.fa-heart"  # adjust to match real markup
 NEXT_PAGE_SELECTOR = """
     a[aria-label='Next']:not(.disabled):not([aria-disabled='true']),
     .pagination a:has(i.fa-angle-right):not(.disabled),
     .pagination button:has(i.fa-angle-right):not(:disabled)
 """
 
-# =======================
-# Logging
-# =======================
-def info(msg: str): print(f"\x1b[36m[i]\x1b[0m {msg}")
-def ok(msg: str): print(f"\x1b[32m[✔]\x1b[0m {msg}")
-def warn(msg: str): print(f"\x1b[33m[!]\x1b[0m {msg}")
-def err(msg: str): print(f"\x1b[31m[×]\x1b[0m {msg}")
+# ============== Logging helpers ==============
+def info(msg): print(f"\x1b[36m[i]\x1b[0m {msg}")
+def ok(msg):   print(f"\x1b[32m[✔]\x1b[0m {msg}")
+def warn(msg): print(f"\x1b[33m[!]\x1b[0m {msg}")
+def err(msg):  print(f"\x1b[31m[×]\x1b[0m {msg}")
 
-# =======================
-# Humanization
-# =======================
-def r(min_ms: int, max_ms: int) -> float:
-    return random.uniform(min_ms / 1000, max_ms / 1000)
+# ============== Randomized pacing ==============
+def r(min_ms, max_ms): return random.uniform(min_ms/1000, max_ms/1000)
+async def step_pause(): await asyncio.sleep(r(BETWEEN_STEPS_MS, BETWEEN_STEPS_MS+400))
+async def fav_pause():  await asyncio.sleep(r(BETWEEN_FAVORITES_MS, BETWEEN_FAVORITES_MS+800))
+async def page_pause(): await asyncio.sleep(r(BETWEEN_PAGES_MS, BETWEEN_PAGES_MS+1000))
 
-async def human_delay(base_ms: int = 300):
-    await asyncio.sleep(r(base_ms, base_ms + 200))
-
-async def step_pause():
-    await asyncio.sleep(r(BETWEEN_STEPS_MS, BETWEEN_STEPS_MS + 300))
-
-async def action_pause():
-    await asyncio.sleep(r(BETWEEN_ACTIONS_MS, BETWEEN_ACTIONS_MS + 600))
-
-async def page_pause():
-    await asyncio.sleep(r(BETWEEN_PAGES_MS, BETWEEN_PAGES_MS + 800))
-
-# =========================
-# Core Functions
-# =========================
-
-async def safe_click(loc: Locator, timeout: int = DEFAULT_TIMEOUT_MS) -> bool:
-    """Safely click an element with error handling and retry logic"""
-    for attempt in range(3):
-        try:
-            await loc.wait_for(state="visible", timeout=timeout)
-            await loc.scroll_into_view_if_needed()
-            await human_delay(200)
-            await loc.click()
-            return True
-        except Exception as e:
-            warn(f"Click failed on attempt {attempt + 1}: {str(e)[:100]}")
-            if attempt < 2:
-                await human_delay(500)
-    warn("Click failed after multiple attempts.")
-    return False
-
-async def _perform_two_click_favorite_action(page: Page, heart_icon: Locator, favorite_list_name: str) -> str:
-    """
-    Performs the full two-click process: heart icon, then list name.
-    Returns: 'favorited', 'already_favorited', or 'failed'
-    """
-    # Step 1: Click the heart icon to open the dropdown
-    info("Clicking heart icon to open dropdown...")
-    if not await safe_click(heart_icon, timeout=5000):
-        return 'failed'
-
-    await human_delay(300)
-
-    # The dropdown menu container becomes visible after the click.
-    try:
-        # Use a scoped locator relative to the heart icon's parent
-        parent_locator = heart_icon.locator("xpath=..")
-        favorites_dropdown = parent_locator.locator(FAVORITES_DROPDOWN)
-        await favorites_dropdown.wait_for(state="visible", timeout=5000)
-    except PWTimeout:
-        warn("Favorites dropdown menu didn't appear in time.")
-        return 'failed'
-    
-    # Step 2: Find the specific favorite list button within the dropdown
-    info(f"Looking for list: '{favorite_list_name}'")
-    list_button = favorites_dropdown.locator(FAVORITE_LIST_BTN_BASE.format(favorite_list_name))
-    
-    if await list_button.count() == 0:
-        warn(f"Could not find favorite list named '{favorite_list_name}'.")
-        await close_favorites_menu(favorites_dropdown)
-        return 'failed'
-
-    # Check if the talent is already in the target list (active checkbox)
-    is_active = "active" in await list_button.get_attribute("class")
-
-    if is_active:
-        info(f"Talent is already in list '{favorite_list_name}'.")
-        # Do not click again to avoid un-favoriting
-        await close_favorites_menu(favorites_dropdown)
-        return 'already_favorited'
-    else:
-        info(f"Adding talent to list '{favorite_list_name}'...")
-        if not await safe_click(list_button):
-            warn("Could not click favorite list button.")
-            await close_favorites_menu(favorites_dropdown)
-            return 'failed'
-
-        await step_pause()
-        
-        await close_favorites_menu(favorites_dropdown)
-        
-        updated_icon_class = await heart_icon.get_attribute("class")
-        if "fas" in updated_icon_class:
-            ok(f"Successfully added to list '{favorite_list_name}'.")
-            return 'favorited'
-        
-        warn("Could not verify that the talent was added.")
-        return 'failed'
-
-async def close_favorites_menu(favorites_dropdown: Locator):
-    """Close the favorites menu if it's still open"""
-    try:
-        close_button = favorites_dropdown.locator("button.close")
-        if await close_button.count() > 0:
-            await safe_click(close_button, timeout=1000)
-        else:
-            await favorites_dropdown.page.keyboard.press("Escape")
-    except Exception:
-        pass
-
-async def process_current_page(page: Page, favorite_list_name: str) -> Dict[str, int]:
-    """Process all talent cards on the current page"""
-    stats = {"seen": 0, "favorited": 0, "already_favorited": 0, "failed": 0}
-
-    heart_icons = page.locator(HEART_ICON)
-    count = await heart_icons.count()
-    
+# ============== Core ==============
+async def click_heart_buttons(page):
+    stats = {"seen": 0, "hearted": 0, "skipped": 0}
+    buttons = page.locator(HEART_ICON)
+    count = await buttons.count()
     if count == 0:
-        warn("No talent cards with heart icons found on this page")
+        warn("No heart buttons found on this page")
         return stats
-    
     stats["seen"] = count
-    info(f"Found {count} talent cards to process")
-    
-    # State variable to track if we've successfully set the list on this page
-    is_list_selected_on_page = False
-    
+    info(f"Found {count} talent cards")
+
     for i in range(count):
-        info(f"\nProcessing talent {i+1}/{count}")
-        current_icon = page.locator(HEART_ICON).nth(i)
-        
-        # Check for pre-favorited talent
-        initial_icon_class = await current_icon.get_attribute("class")
-        if "fas" in initial_icon_class:
-            info("Talent is already favorited. Skipping.")
-            stats["already_favorited"] += 1
-            await action_pause()
-            continue
-            
-        if not is_list_selected_on_page:
-            # For the first unfavorited talent on the page, perform the full two-click action
-            result = await _perform_two_click_favorite_action(page, current_icon, favorite_list_name)
-            if result == 'favorited':
-                is_list_selected_on_page = True
-            
-        else:
-            # For all subsequent unfavorited talents, use the one-click shortcut
-            info("Using one-click shortcut.")
-            if await safe_click(current_icon):
-                result = 'favorited'
-                ok("Successfully added to favorites list.")
-            else:
-                result = 'failed'
-                warn("Failed to add talent with one-click shortcut.")
-        
-        if result == 'favorited':
-            stats["favorited"] += 1
-        elif result == 'already_favorited':
-            stats["already_favorited"] += 1
-        else:
-            stats["failed"] += 1
-        
-        await action_pause()
-    
+        current_btn = buttons.nth(i)
+        try:
+            await current_btn.scroll_into_view_if_needed()
+            await asyncio.sleep(0.2)
+            await current_btn.click()
+            stats["hearted"] += 1
+            ok(f"Hearted talent {i+1}/{count}")
+        except Exception as e:
+            warn(f"Skipped talent {i+1}: {e}")
+            stats["skipped"] += 1
+        if i < count-1:
+            await fav_pause()
     return stats
 
-async def go_to_next_page(page: Page) -> bool:
-    """Navigate to the next page of results"""
+async def go_to_next_page(page):
     try:
         next_link = page.locator(NEXT_PAGE_SELECTOR).first
-        
         if await next_link.count() == 0:
             info("No next page link found")
             return False
-        
         is_disabled = await next_link.get_attribute("aria-disabled")
         if is_disabled == "true":
-            info("Next page link is disabled (last page)")
+            info("Next page link disabled (last page)")
             return False
-        
         await next_link.scroll_into_view_if_needed()
+        await asyncio.sleep(0.2)
         await next_link.click()
-        
-        await page.wait_for_load_state("networkidle", timeout=10000)
+        await page.wait_for_load_state("networkidle", timeout=12000)
         await page_pause()
-        
         return True
-        
     except Exception as e:
-        warn(f"Failed to go to next page: {str(e)[:100]}")
+        warn(f"Next page failed: {e}")
         return False
 
-# =========================
-# Main
-# =========================
+# ============== Main ==============
 async def main():
-    info(f"Starting 'Add to Favorites' automation...")
+    info("Starting 'Add to Favorites'")
     info(f"URL: {START_URL}")
-    info(f"Favorite List Name: {FAVORITE_LIST_NAME}")
-    info(f"CDP URL: {CDP_URL}")
-    
+    info(f"CDP: {CDP_URL}")
+    info(f"SPEED: {SPEED}")
+    info(f"FIRST_HEART_DELAY_MS: {FIRST_HEART_DELAY_MS} (unscaled, first page only)")
+
     async with async_playwright() as p:
-        browser = await p.chromium.connect_over_cdp(CDP_URL)
-        context = browser.contexts[0] if browser.contexts else await browser.new_context()
-        page = context.pages[0] if context.pages else await context.new_page()
-        page.set_default_timeout(DEFAULT_TIMEOUT_MS)
-        
+        # Robust connection
+        try:
+            browser = await p.chromium.connect_over_cdp(CDP_URL)
+            context = browser.contexts[0] if browser.contexts else await browser.new_context()
+            page = context.pages[0] if context.pages else await context.new_page()
+            info("Attached to existing Chrome via CDP")
+            # If user prefers current page, try to keep the current tab and URL
+            try:
+                if use_current:
+                    # Prefer an existing voices.com page if available
+                    all_pages = []
+                    for ctx in browser.contexts:
+                        for pg in ctx.pages:
+                            all_pages.append((ctx, pg))
+                    if all_pages:
+                        def page_rank(item):
+                            _, pg = item
+                            url = (pg.url or "").lower()
+                            score = 0
+                            if url.startswith("http"):
+                                score += 10
+                            if "voices.com" in url:
+                                score += 5
+                            if url.startswith("about:") or url.startswith("chrome"):
+                                score -= 5
+                            return score
+                        context, page = sorted(all_pages, key=page_rank)[-1]
+                    cur = (page.url or '').strip()
+                    if cur:
+                        globals()['START_URL'] = cur
+                        try:
+                            globals()['FIRST_HEART_DELAY_MS'] = 0
+                        except Exception:
+                            pass
+                        info("Using current page; will keep existing URL.")
+            except Exception:
+                pass
+        except Exception as cdp_err:
+            warn(f"Could not attach over CDP ({cdp_err}). Falling back...")
+            user_data = os.getenv("CHROME_USER_DATA", "").strip()
+            if user_data:
+                info(f"Launching persistent context with CHROME_USER_DATA={user_data}")
+                context = await p.chromium.launch_persistent_context(user_data, headless=False, args=[])
+                page = context.pages[0] if context.pages else await context.new_page()
+            else:
+                info("Launching fresh browser (you may need to log in)")
+                browser = await p.chromium.launch(headless=False)
+                context = await browser.new_context()
+                page = await context.new_page()
+
+        # Navigate
         await page.goto(START_URL, wait_until="domcontentloaded")
-        await page_pause()
-        
-        totals = {"seen": 0, "favorited": 0, "already_favorited": 0, "failed": 0}
+        if FIRST_HEART_DELAY_MS > 0:
+            info(f"Initial delay {FIRST_HEART_DELAY_MS}ms — select list if needed...")
+            await asyncio.sleep(FIRST_HEART_DELAY_MS/1000)
+
+        totals = {"seen": 0, "hearted": 0, "skipped": 0}
         page_num = 1
-        
         while page_num <= MAX_PAGES:
-            info(f"\n{'='*50}")
-            info(f"Processing page {page_num}")
-            info(f"{'='*50}")
-            
-            stats = await process_current_page(page, FAVORITE_LIST_NAME)
-            
-            for key in totals:
-                totals[key] += stats.get(key, 0)
-            
-            info(f"\nPage {page_num} results:")
-            info(f"  Seen: {stats['seen']}")
-            ok(f"  Favorited: {stats['favorited']}")
-            info(f"  Already Favorited: {stats['already_favorited']}")
-            if stats['failed'] > 0:
-                err(f"  Failed: {stats['failed']}")
-            
-            if not await go_to_next_page(page):
-                info("No more pages to process")
-                break
-            
+            info(f"\n=== Page {page_num} ===")
+            stats = await click_heart_buttons(page)
+            for k in totals: totals[k] += stats[k]
+            info(f"Page {page_num} results: {stats}")
+            if not await go_to_next_page(page): break
             page_num += 1
-        
-        info(f"\n{'='*50}")
-        ok("AUTOMATION COMPLETE")
-        info(f"{'='*50}")
-        info(f"Total talents seen: {totals['seen']}")
-        ok(f"Successfully favorited: {totals['favorited']}")
-        info(f"Already favorited: {totals['already_favorited']}")
-        if totals['failed'] > 0:
-            err(f"Failed: {totals['failed']}")
-        
-        info("\nDone! Browser remains open.")
+
+        info("\n=== COMPLETE ===")
+        info(f"Seen: {totals['seen']}")
+        ok(f"Hearted: {totals['hearted']}")
+        warn(f"Skipped: {totals['skipped']}")
+        info("Done. Browser stays open.")
 
 if __name__ == "__main__":
     asyncio.run(main())

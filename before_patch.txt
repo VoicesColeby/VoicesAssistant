@@ -1,0 +1,14 @@
+
+        # Right side: transport controls
+        self.play_pause_button = tk.Button(right, text="▶", width=6, command=self.play_pause)
+        self.play_pause_button.pack(side=tk.LEFT, padx=4)
+        self.pause_button = tk.Button(right, text="⏸", width=6, state=tk.DISABLED, command=self.toggle_pause)
+        self.pause_button.pack(side=tk.LEFT, padx=4)
+        self.cancel_button = tk.Button(right, text="⏹", width=6, state=tk.DISABLED, command=self.cancel_run)
+        self.cancel_button.pack(side=tk.LEFT, padx=4)
+        self.close_on_cancel_check = tk.Checkbutton(right, text="Close browser on Cancel", variable=self.close_browser_var)
+        self.close_on_cancel_check.pack(side=tk.LEFT, padx=8)
+        self.save_button = tk.Button(right, text="Save Fields", width=12, command=self.save_fields)
+        self.save_button.pack(side=tk.LEFT, padx=4)
+
+    def show_input_fields(self, action):
