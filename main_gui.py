@@ -1,6 +1,6 @@
 
 import tkinter as tk
-from tkinter import scrolledtext, messagebox, filedialog
+from tkinter import scrolledtext, messagebox, filedialog, simpledialog
 from tkinter import ttk
 import tkinter.font as tkfont
 import subprocess
@@ -563,6 +563,12 @@ class VoicesAutomationApp:
         except Exception:
             pass
 
+        # Ensure the input panel is visible by default
+        try:
+            self.input_frame.grid()
+        except Exception:
+            pass
+
         # Create new fields based on the selected action
         # Per new flow: only Start URL is required for all actions.
         if action == "invite":
@@ -582,31 +588,28 @@ class VoicesAutomationApp:
             except Exception:
                 pass
             self._style_button(save_msg_btn, 'secondary')
-
         elif action == "import_invites":
-            self._import_csv_var = tk.StringVar(value="")
-            # Job # field (required to select correct job each time)
-            self.create_entry("Job #:", "job_query", is_textarea=False)
+            # Hide the input panel to remove the large empty box
+            try:
+                self.input_frame.grid_remove()
+            except Exception:
+                pass
 
-            # Simple CSV picker row (Entry + Browse button)
-            picker_row = ttk.Frame(self.input_frame)
-            self._style_frame(picker_row, as_panel=True)
-            picker_row.pack(fill=tk.X, pady=6)
-            ttk.Label(picker_row, text="CSV File:").pack(side=tk.LEFT, padx=5)
-            csv_entry = ttk.Entry(picker_row, textvariable=self._import_csv_var, width=50)
-            csv_entry.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=5)
-            def _browse_csv():
-                p = filedialog.askopenfilename(title="Select CSV", filetypes=[("CSV Files", "*.csv"), ("All Files", "*.*")])
-                if p:
-                    try:
-                        self._import_csv_var.set(p)
-                    except Exception:
-                        pass
-            browse_btn = ttk.Button(picker_row, text="Browse…", command=_browse_csv, takefocus=True)
-            self._style_button(browse_btn, 'secondary')
-            browse_btn.pack(side=tk.LEFT, padx=6)
-            # Immediately prompt for selection to streamline flow
-            _browse_csv()
+            # Prompt for Job # and CSV path via dialogs
+            try:
+                job = simpledialog.askstring("Job #", "Enter the Job # to invite talents to:")
+            except Exception:
+                job = None
+            self._import_job_number = (job or '').strip()
+
+            try:
+                path = filedialog.askopenfilename(
+                    title="Select CSV",
+                    filetypes=[("CSV Files", "*.csv"), ("All Files", "*.*")],
+                )
+            except Exception:
+                path = ''
+            self._import_csv_path = path or ''
 
         # Prefill from saved values if available
         self.prefill_saved_fields()
@@ -993,19 +996,18 @@ class VoicesAutomationApp:
             pass
 
     def _run_import_invites(self, base_env: dict):
-        # Ask for CSV if not provided via UI
-        path = getattr(self, '_import_csv_var', None)
-        csv_path = ''
-        try:
-            csv_path = (path.get() if path else '')
-        except Exception:
-            csv_path = ''
+        # Ask for CSV if not already provided
+        csv_path = getattr(self, '_import_csv_path', '') or ''
         if not csv_path:
             try:
-                p = filedialog.askopenfilename(title="Select CSV", filetypes=[("CSV Files", "*.csv"), ("All Files", "*.*")])
+                p = filedialog.askopenfilename(
+                    title="Select CSV",
+                    filetypes=[("CSV Files", "*.csv"), ("All Files", "*.*")],
+                )
                 csv_path = p or ''
             except Exception:
                 csv_path = ''
+            self._import_csv_path = csv_path
         if not csv_path or not os.path.exists(csv_path):
             messagebox.showwarning("CSV Required", "Please select a CSV file with a 'username' column.")
             return
@@ -1040,13 +1042,14 @@ class VoicesAutomationApp:
         # We'll navigate explicitly; some scripts honor START_URL
         env['USE_CURRENT_PAGE'] = '0'
         # Require job # so we select the correct job from the modal on every profile
-        job_val = ''
-        try:
-            w = self.input_fields.get('job_query')
-            if w and hasattr(w, 'get'):
-                job_val = (w.get() or '').strip()
-        except Exception:
-            job_val = ''
+        job_val = getattr(self, '_import_job_number', '') or ''
+        if not job_val:
+            try:
+                job = simpledialog.askstring("Job #", "Enter the Job # to invite talents to:")
+            except Exception:
+                job = None
+            job_val = (job or '').strip()
+            self._import_job_number = job_val
         if not job_val:
             messagebox.showwarning("Job # Required", "Enter the Job # to invite talents to. Example: 805775")
             return
