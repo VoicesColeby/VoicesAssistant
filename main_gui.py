@@ -490,25 +490,48 @@ class VoicesAutomationApp:
             "Stop the current automation and reset progress.",
         )
 
-        # Speed slider on the right with dynamic label and endpoints
+        # Speed controls on the right
         speed_row = ttk.Frame(transport)
         speed_row.pack(side=tk.RIGHT, padx=self.spacing['inline'])
         self.speed_var = tk.DoubleVar(value=5.0)  # 1.0 slow .. 5.0 fast
-        self.speed_value_label = ttk.Label(speed_row, text="Speed: 5.0")
-        self.speed_value_label.pack(side=tk.TOP, anchor='e')
+        ttk.Label(speed_row, text='Speed').pack(side=tk.LEFT)
 
         def _on_speed(val):
             try:
-                v = float(val)
-                self.speed_value_label.config(text=f"Speed: {v:.1f}")
+                self.speed_var.set(float(val))
+                self._write_speed_file(self.speed_var.get())
             except Exception:
                 pass
 
-        lblrow = ttk.Frame(speed_row)
-        lblrow.pack(side=tk.TOP, fill=tk.X)
-        ttk.Label(lblrow, text="Slow").pack(side=tk.LEFT)
-        ttk.Label(lblrow, text="Fast").pack(side=tk.RIGHT)
-        ttk.Scale(speed_row, from_=1.0, to=5.0, variable=self.speed_var, orient=tk.HORIZONTAL, length=180, command=_on_speed, takefocus=True).pack(side=tk.TOP)
+        ttk.Scale(
+            speed_row,
+            from_=1.0,
+            to=5.0,
+            variable=self.speed_var,
+            orient=tk.HORIZONTAL,
+            length=180,
+            command=_on_speed,
+            takefocus=True,
+        ).pack(side=tk.LEFT, padx=(self.spacing['inline'], 0))
+
+        def _validate_speed(value: str) -> bool:
+            try:
+                v = float(value)
+                self.speed_var.set(v)
+                self._write_speed_file(v)
+                return True
+            except Exception:
+                return False
+
+        vcmd = (self.master.register(_validate_speed), '%P')
+        ttk.Entry(
+            speed_row,
+            textvariable=self.speed_var,
+            width=5,
+            justify='center',
+            validate='focusout',
+            validatecommand=vcmd,
+        ).pack(side=tk.LEFT, padx=(self.spacing['inline'], 0))
 
         # Removed global Save Fields button; Save Message lives on Message tab
 
