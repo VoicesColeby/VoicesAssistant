@@ -19,9 +19,10 @@ class VoicesAutomationApp:
     def __init__(self, master):
         self.master = master
         master.title("Voices Helper")
-        master.geometry("680x520")
+        master.geometry("800x600")
+        master.minsize(800, 600)
         try:
-            master.resizable(False, False)
+            master.resizable(True, True)
         except Exception:
             pass
 
