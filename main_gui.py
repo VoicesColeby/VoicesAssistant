@@ -566,16 +566,9 @@ class VoicesAutomationApp:
         self._reset_progressbar()
 
         # Start the automation in a new thread to keep the GUI responsive
-        try:
-            self.apply_controls_state(running=True)
-        except Exception:
-            # Fallback to original if present
-            try:
-                self.set_controls_state(running=True)
-            except Exception:
-                pass
         t = threading.Thread(target=self._execute_script_thread, daemon=True)
         t.start()
+        self.apply_controls_state(running=True)
 
     def _ensure_psutil(self):
         try:
@@ -734,13 +727,7 @@ class VoicesAutomationApp:
             with self.process_lock:
                 self.process = None
                 self.is_paused = False
-            try:
-                self.apply_controls_state(running=False)
-            except Exception:
-                try:
-                    self.set_controls_state(running=False)
-                except Exception:
-                    pass
+            self.apply_controls_state(running=False)
             # Reset progress bar when run completes
             self._reset_progressbar()
 
@@ -1187,13 +1174,7 @@ class VoicesAutomationApp:
                 pass
             self.update_console("[i] Canceled run (basic).\n")
         finally:
-            try:
-                self.apply_controls_state(running=False)
-            except Exception:
-                try:
-                    self.set_controls_state(running=False)
-                except Exception:
-                    pass
+            self.apply_controls_state(running=False)
 
     def _try_close_browser(self):
         bp = self.browser_process
