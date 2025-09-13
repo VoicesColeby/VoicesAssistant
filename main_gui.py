@@ -1079,6 +1079,18 @@ class VoicesAutomationApp:
             self.cancel_button.config(state=tk.DISABLED)
             self.is_paused = False
 
+    def play_pause(self):
+        with self.process_lock:
+            proc = self.process
+        if not proc or proc.poll() is not None:
+            self.run_automation()
+            try:
+                self.apply_controls_state(running=True)
+            except Exception:
+                pass
+        else:
+            self.toggle_pause()
+
     def _walk_children(self, psutil_proc):
         try:
             for child in psutil_proc.children(recursive=True):
