@@ -42,6 +42,7 @@ CHOICES_DROPDOWN  = ".choices__list--dropdown"
 CHOICES_ITEMS     = ".choices__list--dropdown .choices__item--choice"
 CHOICES_SINGLE    = ".choices__list--single .choices__item"
 NATIVE_SELECT     = "#request-quote-open-jobs-list"
+SPINNER_BLUE      = ".voices-spinner-blue"
 
 MODAL_SUBMIT_BTN  = "#submit-request-quote"
 
@@ -197,6 +198,7 @@ async def select_job_in_modal(page: Page, job_query: Optional[str]) -> bool:
         return False
     try:
         await choices_container.wait_for(state="visible", timeout=DEFAULT_TIMEOUT_MS)
+        await modal.locator(SPINNER_BLUE).first.wait_for(state="hidden", timeout=DEFAULT_TIMEOUT_MS)
         await inner.click()
         await asyncio.sleep(0.25)
 
