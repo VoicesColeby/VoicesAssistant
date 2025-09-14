@@ -8,6 +8,7 @@ import random
 import json
 from typing import Dict
 from playwright.async_api import async_playwright, Page, Locator, TimeoutError as PWTimeout
+from common_logging import info, ok, warn, err
 
 # =======================
 # Config (env-overridable)
@@ -78,11 +79,7 @@ NEXT_PAGE_SELECTOR = """
     .pagination button:has(i.fa-angle-right):not(:disabled)
 """
 
-# ============== Logging ==============
-def info(msg: str):  print(f"\x1b[36m[i]\x1b[0m {msg}")
-def ok(msg: str):    print(f"\x1b[32m[✔]\x1b[0m {msg}")
-def warn(msg: str):  print(f"\x1b[33m[!]\x1b[0m {msg}")
-def err(msg: str):   print(f"\x1b[31m[×]\x1b[0m {msg}")
+"""Logging provided by common_logging"""
 
 # ============== Humanization (live speed support) ==============
 def _read_speed_file() -> float:

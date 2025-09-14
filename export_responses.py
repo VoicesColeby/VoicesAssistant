@@ -1,4 +1,4 @@
-# export_responses.py
+﻿# export_responses.py
 import asyncio
 import os
 import re
@@ -6,6 +6,7 @@ import random
 import csv
 from typing import Dict, List
 from playwright.async_api import async_playwright, Page, Locator, TimeoutError as PWTimeout
+from common_logging import info, ok, warn, err
 
 # =======================
 # Config (env-overridable)
@@ -36,13 +37,8 @@ OPEN_PROPOSAL_LINK = "a.toggle-proposal-btn:has-text('Open Proposal')"
 PROPOSAL_CONTENT = "div.response-item-proposal-content"
 
 # =======================
-# Logging
+# Logging (common)
 # =======================
-def info(msg: str): print(f"\x1b[36m[i]\x1b[0m {msg}")
-def ok(msg: str): print(f"\x1b[32m[✔]\x1b[0m {msg}")
-def warn(msg: str): print(f"\x1b[33m[!]\x1b[0m {msg}")
-def err(msg: str): print(f"\x1b[31m[×]\x1b[0m {msg}")
-
 # =======================
 # Humanization
 # =======================
@@ -201,3 +197,4 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
