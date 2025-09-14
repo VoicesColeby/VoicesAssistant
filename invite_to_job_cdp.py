@@ -181,7 +181,7 @@ async def select_job_in_modal(page: Page, job_query: Optional[str]) -> bool:
     m = re.search(r"\d+", job_query)
     job_id = m.group(0) if m else None
     title_sub = re.sub(r"\d+", "", job_query).strip()
-    modal = page.locator(MODAL_CONTENT).first
+    modal = page.locator(MODAL_VISIBLE).locator(MODAL_CONTENT).first
     choices_container = modal.locator(CHOICES_CONTAINER).first
     inner = modal.locator(CHOICES_INNER).first
 
