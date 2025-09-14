@@ -102,11 +102,17 @@ async def get_single_text(page: Page) -> str:
         pass
     return ""
 
-async def verify_selected(page: Page, job_id: str) -> bool:
+async def verify_selected(page: Page, job_id: Optional[str], title_sub: str = "") -> bool:
     native = await get_native_value(page)
     single = await get_single_text(page)
     info(f"Verify: native='{native}', single='{single}'")
-    return (native == job_id) or (job_id in single)
+    cond_id = False
+    cond_title = False
+    if job_id:
+        cond_id = (native == job_id) or (job_id in single)
+    if title_sub:
+        cond_title = title_sub.lower() in single.lower()
+    return cond_id or cond_title
 
 async def js_click_option(page: Page, job_id: str) -> bool:
     """Dispatch pointer/mouse/click via JS on the exact option by data-value.
@@ -158,6 +164,7 @@ async def select_job_in_modal(page: Page, job_query: Optional[str]) -> bool:
     info(f"Selecting job: {job_query}")
     m = re.search(r"\d+", job_query)
     job_id = m.group(0) if m else None
+    title_sub = re.sub(r"\d+", "", job_query).strip()
     modal = page.locator(MODAL_CONTENT).first
     choices_container = modal.locator(CHOICES_CONTAINER).first
     inner = modal.locator(CHOICES_INNER).first
@@ -222,34 +229,61 @@ async def select_job_in_modal(page: Page, job_query: Optional[str]) -> bool:
             )
             if _ok:
                 await asyncio.sleep(0.3)
-                if await verify_selected(page, job_id):
+                if await verify_selected(page, job_id, title_sub):
                     return True
         return await final_failure()
-    if not job_id:
-        warn("No job_id parsed; cannot select via Choices")
-        return await final_failure()
-    if await js_click_option(page, job_id):
+    if job_id:
+        try:
+            inp = modal.locator(CHOICES_INPUT).first
+            await inp.fill("")
+            await inp.type(job_id)
+            await inp.press("Enter")
+            await asyncio.sleep(0.3)
+            if await verify_selected(page, job_id, title_sub):
+                return True
+        except Exception as e:
+            warn(f"Typing job_id failed: {e}")
+        try:
+            item = modal.locator(f".choices__item[data-value='{job_id}']").first
+            if await item.count():
+                await item.click()
+                await asyncio.sleep(0.3)
+                if await verify_selected(page, job_id, title_sub):
+                    return True
+        except Exception as e:
+            warn(f"Clicking by data-value failed: {e}")
+    if title_sub:
+        try:
+            item = modal.locator(f".choices__item:has-text(\"{title_sub}\")").first
+            if await item.count():
+                await item.click()
+                await asyncio.sleep(0.3)
+                if await verify_selected(page, job_id, title_sub):
+                    return True
+        except Exception as e:
+            warn(f"Clicking by title substring failed: {e}")
+    if job_id and await js_click_option(page, job_id):
         await asyncio.sleep(0.3)
-        if await verify_selected(page, job_id):
+        if await verify_selected(page, job_id, title_sub):
             return True
     warn("JS click on option failed; trying native set + verify")
-    _ok = await page.evaluate(
-        """(sel, val) => {
-            const el = document.querySelector(sel);
-            if (!el) return false;
-            el.value = String(val);
-            el.dispatchEvent(new Event('change', {bubbles:true}));
-            return true;
-        }""",
-        NATIVE_SELECT,
-        job_id,
-    )
-    if _ok:
-        await asyncio.sleep(0.3)
-        if await verify_selected(page, job_id):
-            return True
-
-    success = await verify_selected(page, job_id)
+    if job_id:
+        _ok = await page.evaluate(
+            """(sel, val) => {
+                const el = document.querySelector(sel);
+                if (!el) return false;
+                el.value = String(val);
+                el.dispatchEvent(new Event('change', {bubbles:true}));
+                return true;
+            }""",
+            NATIVE_SELECT,
+            job_id,
+        )
+        if _ok:
+            await asyncio.sleep(0.3)
+            if await verify_selected(page, job_id, title_sub):
+                return True
+    success = await verify_selected(page, job_id, title_sub)
     if success:
         return True
 
