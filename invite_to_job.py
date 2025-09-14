@@ -255,7 +255,21 @@ async def select_job_in_modal(page: Page, job_query: str) -> bool:
         await asyncio.sleep(AFTER_CHOICES_OPEN/1000)
 
         dropdown = modal.locator(CHOICES_DROPDOWN).first
-        await dropdown.wait_for(state="visible", timeout=6000)
+        aria = await dropdown.get_attribute("aria-expanded")
+        info(f"Dropdown aria-expanded after click: {aria}")
+
+        try:
+            await modal.locator(f"{CHOICES_DROPDOWN}[aria-expanded='true']").wait_for(state="visible", timeout=6000)
+        except PWTimeout:
+            warn("Dropdown did not open (aria-expanded!='true'). Capturing screenshot…")
+            os.makedirs("logs", exist_ok=True)
+            try:
+                await page.screenshot(path="logs/dropdown_not_open.png")
+            except Exception:
+                pass
+            raise
+
+        dropdown = modal.locator(f"{CHOICES_DROPDOWN}[aria-expanded='true']").first
 
         options = dropdown.locator(CHOICES_ITEMS)
         count = await options.count()
