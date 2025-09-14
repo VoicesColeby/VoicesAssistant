@@ -137,6 +137,20 @@ async def select_job_in_modal(page: Page, job_query: Optional[str]) -> bool:
         await choices_container.wait_for(state="visible", timeout=DEFAULT_TIMEOUT_MS)
         await inner.click()
         await asyncio.sleep(0.25)
+
+        dropdown = modal.locator(CHOICES_DROPDOWN).first
+        aria = await dropdown.get_attribute("aria-expanded")
+        info(f"Dropdown aria-expanded after click: {aria}")
+        try:
+            await modal.locator(f"{CHOICES_DROPDOWN}[aria-expanded='true']").wait_for(state="visible", timeout=5000)
+        except PWTimeout:
+            warn("Dropdown did not open (aria-expanded!='true'). Capturing screenshot…")
+            os.makedirs("logs", exist_ok=True)
+            try:
+                await page.screenshot(path="logs/dropdown_not_open.png")
+            except Exception:
+                pass
+            raise
     except Exception:
         warn("Choices.js dropdown not found; trying native select fallback")
         if job_id:
