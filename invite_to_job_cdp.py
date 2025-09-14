@@ -105,15 +105,30 @@ async def get_single_text(page: Page) -> str:
 
 async def verify_selected(page: Page, job_id: Optional[str], title_sub: str = "") -> bool:
     native = await get_native_value(page)
-    single = await get_single_text(page)
-    info(f"Verify: native='{native}', single='{single}'")
-    cond_id = False
-    cond_title = False
+    data_val = ""
+    single = ""
+    try:
+        sel = page.locator(CHOICES_SINGLE).first
+        if await sel.count():
+            single = (await sel.inner_text()).strip()
+            data_val = await sel.get_attribute("data-value") or ""
+    except Exception:
+        pass
+    info(f"Verify: native='{native}', single='{single}', data='{data_val}'")
+
+    cond_native = False
+    cond_data = False
+    cond_text = False
     if job_id:
-        cond_id = (native == job_id) or (job_id in single)
+        cond_native = native == job_id
+        cond_data = data_val == job_id
+        cond_text = job_id in single
     if title_sub:
-        cond_title = title_sub.lower() in single.lower()
-    return cond_id or cond_title
+        cond_text = cond_text or title_sub.lower() in single.lower()
+
+    if job_id:
+        return cond_native and cond_data and cond_text
+    return cond_text
 
 async def js_click_option(page: Page, job_id: str) -> bool:
     """Dispatch pointer/mouse/click via JS on the exact option by data-value.
