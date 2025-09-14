@@ -161,6 +161,33 @@ async def select_job_in_modal(page: Page, job_query: Optional[str]) -> bool:
     modal = page.locator(MODAL_CONTENT).first
     choices_container = modal.locator(CHOICES_CONTAINER).first
     inner = modal.locator(CHOICES_INNER).first
+
+    async def final_failure() -> bool:
+        os.makedirs("logs", exist_ok=True)
+        try:
+            await page.screenshot(path=f"logs/select_job_failure_{job_id or 'unknown'}.png")
+        except Exception:
+            pass
+        try:
+            single = await get_single_text(page)
+        except Exception:
+            single = ""
+        try:
+            native = await get_native_value(page)
+        except Exception:
+            native = None
+        warn(
+            f"Failed to select job (id={job_id}, query='{job_query}') — native='{native}', single='{single}'"
+        )
+        if os.getenv("DEBUG_CHOICES"):
+            try:
+                html = await modal.locator(CHOICES_DROPDOWN).first.inner_html()
+                fname = f"logs/choices_dropdown_{job_id or 'unknown'}.html"
+                with open(fname, "w", encoding="utf-8") as f:
+                    f.write(html)
+            except Exception:
+                pass
+        return False
     try:
         await choices_container.wait_for(state="visible", timeout=DEFAULT_TIMEOUT_MS)
         await inner.click()
@@ -195,14 +222,16 @@ async def select_job_in_modal(page: Page, job_query: Optional[str]) -> bool:
             )
             if _ok:
                 await asyncio.sleep(0.3)
-                return await verify_selected(page, job_id)
-        return False
+                if await verify_selected(page, job_id):
+                    return True
+        return await final_failure()
     if not job_id:
         warn("No job_id parsed; cannot select via Choices")
-        return False
+        return await final_failure()
     if await js_click_option(page, job_id):
         await asyncio.sleep(0.3)
-        return await verify_selected(page, job_id)
+        if await verify_selected(page, job_id):
+            return True
     warn("JS click on option failed; trying native set + verify")
     _ok = await page.evaluate(
         """(sel, val) => {
@@ -217,8 +246,14 @@ async def select_job_in_modal(page: Page, job_query: Optional[str]) -> bool:
     )
     if _ok:
         await asyncio.sleep(0.3)
-        return await verify_selected(page, job_id)
-    return await verify_selected(page, job_id)
+        if await verify_selected(page, job_id):
+            return True
+
+    success = await verify_selected(page, job_id)
+    if success:
+        return True
+
+    return await final_failure()
 
 async def close_modal(page: Page):
     try:
