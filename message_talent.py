@@ -7,6 +7,7 @@ import random
 import re
 from typing import Dict
 from playwright.async_api import async_playwright, Page, Locator, TimeoutError as PWTimeout
+from common_logging import info, ok, warn, err
 
 # =======================
 # Config (env-overridable)
@@ -78,19 +79,8 @@ SUCCESS_MSG = ".toast-success, .alert-success, .success-message"
 ERROR_MSG   = ".toast-error, .alert-danger, .error-message"
 
 # =======================
-# Logging
-# =======================
-def info(msg: str): print(f"\x1b[36m[i]\x1b[0m {msg}")
-def ok(msg: str): print(f"\x1b[32m[✔]\x1b[0m {msg}")
-def warn(msg: str): print(f"\x1b[33m[!]\x1b[0m {msg}")
-def err(msg: str): print(f"\x1b[31m[×]\x1b[0m {msg}")
-
-# =======================
 # Humanization
 # =======================
-def r(min_ms: int, max_ms: int) -> float:
-    return random.uniform(min_ms / 1000, max_ms / 1000)
-
 async def human_delay(base_ms: int = 300):
     await asyncio.sleep(r(base_ms, base_ms + 250))
 

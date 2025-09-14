@@ -64,7 +64,6 @@ class VoicesAutomationApp:
         self.use_current_page_var = tk.BooleanVar(value=True)
 
         # Initialize ttk theme and styling
-        self._init_theme()
         self._init_ttk_theme()
         self.create_widgets()
         self.load_saved_fields()

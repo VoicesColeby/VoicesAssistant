@@ -2,6 +2,7 @@ import asyncio
 import os
 import random
 from playwright.async_api import async_playwright, Page, Locator
+from common_logging import info, ok, warn, err
 
 # ================== Config ==================
 START_URL = os.getenv("START_URL", "https://www.voices.com/talents/search")
@@ -10,6 +11,7 @@ SPEED = float(os.getenv("SPEED", "1.0"))
 SPEED_FILE = os.getenv("SPEED_FILE", "").strip()
 FIRST_HEART_DELAY_MS = int(os.getenv("FIRST_HEART_DELAY_MS", "0"))  # unscaled, default off
 MAX_PAGES = int(os.getenv("MAX_PAGES", "999"))
+use_current = os.getenv("USE_CURRENT_PAGE", "1").strip().lower() in ("1", "true", "yes")
 
 # pacing (base values; live speed scaling applied via r())
 BASE_BETWEEN_STEPS_MS = 700
@@ -32,10 +34,7 @@ NEXT_PAGE_SELECTOR = """
 """
 
 # ============== Logging helpers ==============
-def info(msg): print(f"\x1b[36m[i]\x1b[0m {msg}")
-def ok(msg):   print(f"\x1b[32m[✔]\x1b[0m {msg}")
-def warn(msg): print(f"\x1b[33m[!]\x1b[0m {msg}")
-def err(msg):  print(f"\x1b[31m[×]\x1b[0m {msg}")
+# moved to common_logging module
 
 # ============== Randomized pacing (live) ==============
 def _read_speed_file() -> float:

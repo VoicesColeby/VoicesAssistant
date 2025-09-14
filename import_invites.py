@@ -5,22 +5,7 @@ import re
 import time
 import subprocess
 from typing import List, Tuple
-
-
-def info(msg: str):
-    print(f"[i] {msg}", flush=True)
-
-
-def ok(msg: str):
-    print(f"[✓] {msg}", flush=True)
-
-
-def warn(msg: str):
-    print(f"[!] {msg}", flush=True)
-
-
-def err(msg: str):
-    print(f"[x] {msg}", flush=True)
+from common_logging import info, ok, warn, err
 
 
 def read_env(name: str, default: str = "") -> str:
@@ -171,4 +156,3 @@ def main() -> int:
 
 if __name__ == '__main__':
     sys.exit(main())
-
