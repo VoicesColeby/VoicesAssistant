@@ -169,20 +169,47 @@ async def verify_selected(page: Page, job_id: str) -> bool:
     return (native == job_id) or (job_id in single)
 
 async def js_click_option(page: Page, job_id: str) -> bool:
-    """Dispatch pointer/mouse/click via JS on the exact option by data-value."""
-    return await page.evaluate(
-        """({jobId, itemsSel}) => {
-            const el = document.querySelector(`${itemsSel}[data-value="${jobId}"]`);
-            if (!el) return false;
-            el.scrollIntoView({block:'nearest'});
-            const ev = (t) => new MouseEvent(t, {bubbles:true, cancelable:true, view:window});
-            el.dispatchEvent(new PointerEvent('pointerdown', {bubbles:true}));
-            el.dispatchEvent(ev('mousedown'));
-            el.click();
-            return true;
-        }""",
-        {"jobId": job_id, "itemsSel": CHOICES_ITEMS}
-    )
+    """Dispatch pointer/mouse/click via JS on the exact option by data-value.
+
+    Logs lookup failures (with available choices), confirms the selected option
+    text on success, and surfaces any exception stack traces from the JS side.
+    """
+    try:
+        result = await page.evaluate(
+            """({jobId, itemsSel}) => {
+                const items = Array.from(document.querySelectorAll(itemsSel));
+                const values = items.map(el => el.getAttribute('data-value'));
+                const el = items.find(el => el.getAttribute('data-value') === jobId);
+                if (!el) {
+                    return {success:false, values};
+                }
+                try {
+                    el.scrollIntoView({block:'nearest'});
+                    const ev = (t) => new MouseEvent(t, {bubbles:true, cancelable:true, view:window});
+                    el.dispatchEvent(new PointerEvent('pointerdown', {bubbles:true}));
+                    el.dispatchEvent(ev('mousedown'));
+                    el.click();
+                    return {success:true, text: el.textContent, values};
+                } catch (err) {
+                    return {success:false, values, error: err.stack || String(err)};
+                }
+            }""",
+            {"jobId": job_id, "itemsSel": CHOICES_ITEMS}
+        )
+    except Exception as e:
+        err(f"js_click_option evaluate failed for job_id '{job_id}': {e}")
+        return False
+
+    if not result.get("success"):
+        available = ", ".join(result.get("values") or [])
+        warn(f"js_click_option: no element for job_id '{job_id}'. Available: [{available}]")
+        if result.get("error"):
+            err(f"js_click_option click error: {result['error']}")
+        return False
+
+    selected_text = (result.get("text") or "").strip()
+    info(f"js_click_option: selected option '{selected_text}'")
+    return True
 
 # ========================= Main Actions =========================
 
