@@ -371,6 +371,32 @@ async def select_job_in_modal(page: Page, job_query: str) -> bool:
     except Exception as e:
         warn(f"Native select method failed: {str(e)[:140]}")
 
+    # Final failure: capture state for debugging
+    os.makedirs("logs", exist_ok=True)
+    try:
+        await page.screenshot(path=f"logs/select_job_failure_{job_id or 'unknown'}.png")
+    except Exception:
+        pass
+    try:
+        single = await get_single_text(page)
+    except Exception:
+        single = ""
+    try:
+        native = await get_native_value(page)
+    except Exception:
+        native = None
+    warn(
+        f"Failed to select job (id={job_id}, query='{job_query}') — native='{native}', single='{single}'"
+    )
+    if os.getenv("DEBUG_CHOICES"):
+        try:
+            html = await modal.locator(CHOICES_DROPDOWN).first.inner_html()
+            fname = f"logs/choices_dropdown_{job_id or 'unknown'}.html"
+            with open(fname, "w", encoding="utf-8") as f:
+                f.write(html)
+        except Exception:
+            pass
+
     return False
 
 async def check_invitation_result(page: Page) -> str:
