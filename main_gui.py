@@ -1053,7 +1053,12 @@ class VoicesAutomationApp:
         if not job_val:
             messagebox.showwarning("Job # Required", "Enter the Job # to invite talents to. Example: 805775")
             return
-        env['JOB_QUERY'] = job_val
+        sanitized_job_val = re.sub(r"\D", "", job_val)
+        if not sanitized_job_val:
+            messagebox.showwarning("Job # Required", "Job # must contain digits. Example: 805775")
+            return
+        self._import_job_number = sanitized_job_val
+        env['JOB_QUERY'] = sanitized_job_val
 
         # Loop each username and invite via profile URL
         self._stop_import = False
