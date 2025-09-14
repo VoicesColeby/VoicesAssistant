@@ -753,8 +753,19 @@ class VoicesAutomationApp:
                 script_path = "message_talent.py"
                 env['MESSAGE'] = self.input_fields['message'].get("1.0", tk.END).strip()
             elif self.selected_action == "import_invites":
-                self._run_import_invites(env)
-                return
+                # Prepare to run dedicated import script
+                csv_path = getattr(self, '_import_csv_path', '') or ''
+                job_val = getattr(self, '_import_job_number', '') or ''
+                job_digits = re.sub(r"\D", "", job_val)
+                if not csv_path or not os.path.exists(csv_path):
+                    messagebox.showwarning("CSV Required", "Please select a CSV file with a 'username' column.")
+                    return
+                if not job_digits:
+                    messagebox.showwarning("Job # Required", "Enter a numeric Job # to invite talents to (e.g., 805775)")
+                    return
+                env['CSV_PATH'] = csv_path
+                env['JOB_QUERY'] = job_digits
+                script_path = "import_invites.py"
 
             # Ensure the CDP URL is always set (attach to your debugging browser)
             # Always use default debug URL unless overridden via environment
@@ -770,10 +781,17 @@ class VoicesAutomationApp:
             if self.selected_action == "invite":
                 env['SKIP_FIRST_TALENT'] = '1'
                 self.update_console("[i] Invite flow: will skip the first talent (assumed manual).\n")
+            if self.selected_action == "import_invites":
+                self.update_console(f"[i] CSV: {env.get('CSV_PATH')}\n")
+                self.update_console(f"[i] Job #: {env.get('JOB_QUERY')}\n")
 
-            # Always use the current page; do not navigate
-            env['USE_CURRENT_PAGE'] = '1'
-            self.update_console("[i] Using current browser tab; no navigation.\n")
+            # Use current tab for single-page flows; the import script controls navigation per profile
+            if self.selected_action == "import_invites":
+                env['USE_CURRENT_PAGE'] = '0'
+                self.update_console("[i] Import flow: will navigate to each profile from CSV.\n")
+            else:
+                env['USE_CURRENT_PAGE'] = '1'
+                self.update_console("[i] Using current browser tab; no navigation.\n")
 
             # Apply speed slider across flows via env overrides
             try:
@@ -995,160 +1013,6 @@ class VoicesAutomationApp:
         except Exception:
             pass
 
-    def _run_import_invites(self, base_env: dict):
-        # Ask for CSV if not already provided
-        csv_path = getattr(self, '_import_csv_path', '') or ''
-        if not csv_path:
-            try:
-                p = filedialog.askopenfilename(
-                    title="Select CSV",
-                    filetypes=[("CSV Files", "*.csv"), ("All Files", "*.*")],
-                )
-                csv_path = p or ''
-            except Exception:
-                csv_path = ''
-            self._import_csv_path = csv_path
-        if not csv_path or not os.path.exists(csv_path):
-            messagebox.showwarning("CSV Required", "Please select a CSV file with a 'username' column.")
-            return
-
-        # Parse CSV and collect usernames
-        try:
-            with open(csv_path, 'r', encoding='utf-8-sig', newline='') as f:
-                reader = csv.DictReader(f)
-                # Find username column (case-insensitive)
-                fieldmap = { (c or '').strip().lower(): c for c in (reader.fieldnames or []) }
-                ucol = fieldmap.get('username')
-                if not ucol:
-                    messagebox.showerror("CSV Error", "Could not find a 'username' column in the CSV.")
-                    return
-                usernames = [ (row.get(ucol) or '').strip() for row in reader ]
-        except Exception as e:
-            messagebox.showerror("CSV Error", f"Failed to read CSV: {e}")
-            return
-        usernames = [u for u in usernames if u]
-        if not usernames:
-            messagebox.showinfo("No Users", "No usernames found in the CSV.")
-            return
-
-        total = len(usernames)
-        self.update_console(f"[i] Importing {total} usernames from CSV...\n")
-
-        # Ensure debug URL
-        env = base_env.copy()
-        if 'DEBUG_URL' not in env or not env['DEBUG_URL']:
-            env['DEBUG_URL'] = "http://127.0.0.1:9222"
-
-        # We'll navigate explicitly; some scripts honor START_URL
-        env['USE_CURRENT_PAGE'] = '0'
-        # Require job # so we select the correct job from the modal on every profile
-        job_val = getattr(self, '_import_job_number', '') or ''
-        if not job_val:
-            try:
-                job = simpledialog.askstring("Job #", "Enter the Job # to invite talents to:")
-            except Exception:
-                job = None
-            job_val = (job or '').strip()
-            self._import_job_number = job_val
-        if not job_val:
-            messagebox.showwarning("Job # Required", "Enter the Job # to invite talents to. Example: 805775")
-            return
-        sanitized_job_val = re.sub(r"\D", "", job_val)
-        if not sanitized_job_val:
-            messagebox.showwarning("Job # Required", "Job # must contain digits. Example: 805775")
-            return
-        self._import_job_number = sanitized_job_val
-        env['JOB_QUERY'] = sanitized_job_val
-
-        # Loop each username and invite via profile URL
-        self._stop_import = False
-        successes = []
-        failures = []
-        for idx, username in enumerate(usernames, start=1):
-            if getattr(self, '_stop_import', False):
-                self.update_console("[i] Import canceled.\n")
-                break
-            profile_url = f"https://www.voices.com/profile/{username}"
-            self.update_console(f"[i] ({idx} of {total}) Inviting: {username}\n")
-            # Choose script that can navigate to START_URL
-            script_path = "invite_to_job_cdp.py" if os.path.exists(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'invite_to_job_cdp.py')) else "invite_to_job.py"
-            run_env = env.copy()
-            run_env['START_URL'] = profile_url
-
-            # Start subprocess
-            creationflags = 0
-            try:
-                creationflags = getattr(subprocess, 'CREATE_NEW_PROCESS_GROUP', 0)
-            except Exception:
-                pass
-            with self.process_lock:
-                run_env['PYTHONUNBUFFERED'] = '1'
-                run_env['PYTHONIOENCODING'] = 'utf-8'
-                self.process = subprocess.Popen(
-                    [sys.executable, script_path],
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.STDOUT,
-                    text=True,
-                    env=run_env,
-                    creationflags=creationflags,
-                )
-            proc = self.process
-            try:
-                for line in proc.stdout:
-                    self.update_console(line)
-            except Exception:
-                pass
-            finally:
-                try:
-                    proc.wait(timeout=10)
-                except Exception:
-                    pass
-            rc = None
-            try:
-                rc = proc.returncode
-            except Exception:
-                rc = None
-            if rc == 0:
-                successes.append(username)
-                self.update_console(f"[i] Invited: {username}\n")
-            else:
-                failures.append((username, rc))
-                self.update_console(f"[x] Failed to invite: {username} (code={rc})\n")
-            # Apply pacing based on speed slider (1 slow .. 5 fast)
-            try:
-                speed = float(getattr(self, 'speed_var', tk.DoubleVar(value=5.0)).get())
-                delay = max(0.0, (6.0 - speed) * 0.4)
-                if delay > 0:
-                    time.sleep(delay)
-            except Exception:
-                pass
-        # Summary
-        total_done = len(successes) + len(failures)
-        self.update_console(f"[i] Import invites finished. {len(successes)} succeeded, {len(failures)} failed.\n")
-        if failures:
-            failed_list = ", ".join([u for (u, _) in failures[:10]])
-            more = "" if len(failures) <= 10 else f" (+{len(failures)-10} more)"
-            self.update_console(f"[x] Failed usernames: {failed_list}{more}\n")
-            try:
-                base, ext = os.path.splitext(csv_path)
-                out_path = base + "_failures.csv"
-                with open(out_path, 'w', encoding='utf-8', newline='') as f:
-                    writer = csv.writer(f)
-                    writer.writerow(["username", "code"])
-                    for (u, code) in failures:
-                        writer.writerow([u, code if code is not None else ""])
-                self.update_console(f"[i] Wrote failures CSV: {out_path}\n")
-            except Exception as e:
-                self.update_console(f"[x] Failed to write failures CSV: {e}\n")
-        # Final popup summary
-        try:
-            if failures:
-                messagebox.showinfo("Import Invites Summary", f"Finished.\nSuccesses: {len(successes)}\nFailures: {len(failures)}\nA failures CSV has been saved next to your source file.")
-            else:
-                messagebox.showinfo("Import Invites Summary", f"Finished.\nAll {len(successes)} usernames invited successfully.")
-        except Exception:
-            pass
-
     # ===== Controls =====
     def apply_controls_state(self, running: bool):
         """Enable/disable transport controls based on running/paused state."""
@@ -1262,11 +1126,6 @@ class VoicesAutomationApp:
             proc = self.process
         if not proc or proc.poll() is not None:
             return
-        # Signal import loops to stop after current task
-        try:
-            self._stop_import = True
-        except Exception:
-            pass
         try:
             psutil = self._ensure_psutil()
             if psutil is None:

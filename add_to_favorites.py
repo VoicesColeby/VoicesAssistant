@@ -1,7 +1,7 @@
 import asyncio
 import os
 import random
-from playwright.async_api import async_playwright
+from playwright.async_api import async_playwright, Page, Locator
 
 # ================== Config ==================
 START_URL = os.getenv("START_URL", "https://www.voices.com/talents/search")
@@ -17,7 +17,14 @@ BASE_BETWEEN_FAVORITES_MS = 1200
 BASE_BETWEEN_PAGES_MS = 1500
 
 # selectors
-HEART_ICON = "button.add-to-favorites, i.fa-heart-o, i.fa-heart"  # adjust to match real markup
+HEART_ICON = ", ".join([
+    "i.action-list-btn.fa-heart",      # solid heart on card actions
+    "i.action-list-btn.fa-heart-o",    # legacy outline heart
+    "i.fas.fa-heart",                  # FA5 solid
+    "i.far.fa-heart",                  # FA5 outline
+    "button.add-to-favorites",         # legacy button
+    "[aria-label*='Favorite']",        # accessibility label
+])
 NEXT_PAGE_SELECTOR = """
     a[aria-label='Next']:not(.disabled):not([aria-disabled='true']),
     .pagination a:has(i.fa-angle-right):not(.disabled),
@@ -70,7 +77,30 @@ async def click_heart_buttons(page):
         try:
             await current_btn.scroll_into_view_if_needed()
             await asyncio.sleep(0.2)
-            await current_btn.click()
+            # Hover to reveal any on-hover controls, then force-click
+            try:
+                await current_btn.hover()
+            except Exception:
+                pass
+            await current_btn.click(force=True)
+            # If the favorites dropdown opens, close it so we can continue
+            try:
+                dropdown = page.locator('.action-list-dropdown')
+                if await dropdown.is_visible():
+                    done_btn = dropdown.locator("[data-toggle='action-list']:has-text('Done')").first
+                    if await done_btn.count() > 0:
+                        await done_btn.click()
+                    else:
+                        # Fallback: try the close icon or Escape
+                        close_btn = dropdown.locator(".close[data-toggle='action-list']").first
+                        if await close_btn.count() > 0:
+                            await close_btn.click()
+                        else:
+                            await page.keyboard.press('Escape')
+                    # brief settle after closing
+                    await asyncio.sleep(0.2)
+            except Exception:
+                pass
             stats["hearted"] += 1
             ok(f"Hearted talent {i+1}/{count}")
         except Exception as e:
