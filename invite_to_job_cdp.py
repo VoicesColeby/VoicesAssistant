@@ -234,15 +234,14 @@ async def select_job_in_modal(page: Page, job_query: Optional[str]) -> bool:
         warn("Choices.js dropdown not found; trying native select fallback")
         if job_id:
             _ok = await page.evaluate(
-                """(sel, val) => {
+                """({sel, val}) => {
                     const el = document.querySelector(sel);
                     if (!el) return false;
                     el.value = String(val);
                     el.dispatchEvent(new Event('change', {bubbles:true}));
                     return true;
                 }""",
-                NATIVE_SELECT,
-                job_id,
+                {"sel": NATIVE_SELECT, "val": job_id},
             )
             if _ok:
                 await asyncio.sleep(0.3)
@@ -286,15 +285,14 @@ async def select_job_in_modal(page: Page, job_query: Optional[str]) -> bool:
     warn("JS click on option failed; trying native set + verify")
     if job_id:
         _ok = await page.evaluate(
-            """(sel, val) => {
+            """({sel, val}) => {
                 const el = document.querySelector(sel);
                 if (!el) return false;
                 el.value = String(val);
                 el.dispatchEvent(new Event('change', {bubbles:true}));
                 return true;
             }""",
-            NATIVE_SELECT,
-            job_id,
+            {"sel": NATIVE_SELECT, "val": job_id},
         )
         if _ok:
             await asyncio.sleep(0.3)
