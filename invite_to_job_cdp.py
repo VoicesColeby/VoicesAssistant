@@ -314,20 +314,50 @@ async def close_modal(page: Page):
     except Exception:
         pass
 
-async def check_invitation_result(page: Page) -> str:
+async def check_invitation_result(page: Page, timeout: int = DEFAULT_TIMEOUT_MS) -> str:
+    """Wait for a success or error toast after submitting an invite.
+
+    If no toast appears within ``timeout`` milliseconds, return ``"unknown"``.
+    """
+    success_task = asyncio.create_task(
+        page.wait_for_selector(SUCCESS_MSG, timeout=timeout)
+    )
+    already_task = asyncio.create_task(
+        page.wait_for_selector(ALREADY_INVITED_MSG, timeout=timeout)
+    )
+    error_task = asyncio.create_task(
+        page.wait_for_selector(ERROR_MSG, timeout=timeout)
+    )
+
+    done, pending = await asyncio.wait(
+        [success_task, already_task, error_task],
+        return_when=asyncio.FIRST_COMPLETED,
+        timeout=timeout / 1000,
+    )
+
+    for task in pending:
+        task.cancel()
+
+    if not done:
+        warn("No invitation result detected within timeout")
+        return "unknown"
+
+    finished = done.pop()
     try:
-        if await page.locator(SUCCESS_MSG).first.count():
-            ok("Invitation success toast detected")
-            return 'success'
-        if await page.locator(ALREADY_INVITED_MSG).first.count():
-            info("Already invited message detected")
-            return 'already'
-        if await page.locator(ERROR_MSG).first.count():
-            err("Error toast detected")
-            return 'failed'
+        await finished
     except Exception:
         pass
-    return 'success'
+
+    if finished is success_task:
+        ok("Invitation success toast detected")
+        return "success"
+    if finished is already_task:
+        info("Already invited message detected")
+        return "already"
+    if finished is error_task:
+        err("Error toast detected")
+        return "failed"
+    return "unknown"
 
 async def invite_single_talent(page: Page, invite_button: Locator, job_query: Optional[str]) -> str:
     try:
@@ -371,6 +401,8 @@ async def invite_single_talent(page: Page, invite_button: Locator, job_query: Op
 
     await asyncio.sleep(1.0)
     result = await check_invitation_result(page)
+    if result == "unknown":
+        warn("Invitation outcome unclear (no toast detected)")
     await close_modal(page)
     return result
 
