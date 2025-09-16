@@ -11,7 +11,7 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 import tkinter as tk
-from tkinter import ttk, filedialog, messagebox
+from tkinter import ttk, filedialog, messagebox, scrolledtext
 
 
 DEFAULT_START_URL = "https://www.voices.com/talents/search?keywords=&language_ids=1"
@@ -96,6 +96,16 @@ class App(tk.Tk):
         self.title("Voices Inviter GUI")
         self.geometry("900x650")
 
+        # Consistent theming
+        self.style = ttk.Style(self)
+        try:
+            self.style.theme_use("clam")
+        except Exception:
+            pass
+
+        # Status text
+        self.status_var = tk.StringVar(value="Ready")
+
         self.script_path = Path(__file__).parent / "invite_all.py"
         if not self.script_path.exists():
             messagebox.showerror("Missing script", f"Could not find invite_all.py next to {Path(__file__).name}")
@@ -176,24 +186,38 @@ class App(tk.Tk):
             self.var_message_text.set(self.msg_text.get("1.0", "end").strip())
         self.msg_text.bind("<FocusOut>", lambda e: _sync_msg())
 
-        # Row 4: Actions
-        sep = ttk.Separator(frm)
-        sep.grid(row=4, column=0, columnspan=6, sticky="we", padx=6, pady=(4, 6))
-        ttk.Button(frm, text="Run", command=self.run_inviter).grid(row=5, column=0, sticky="w", **pad)
-        ttk.Button(frm, text="Stop", command=self.stop_inviter).grid(row=5, column=1, sticky="w", **pad)
-        ttk.Button(frm, text="Settings…", command=self.open_settings_dialog).grid(row=5, column=2, sticky="w", **pad)
-        ttk.Button(frm, text="Save Settings", command=self.save_settings).grid(row=5, column=3, sticky="w", **pad)
-        ttk.Button(frm, text="Open Log", command=self.open_log).grid(row=5, column=4, sticky="w", **pad)
+        # Row 4: Actions frame
+        actions = ttk.LabelFrame(frm, text="Actions")
+        actions.grid(row=4, column=0, columnspan=6, sticky="ew", padx=6, pady=4)
+        self.btn_run = ttk.Button(actions, text="Run", command=self.run_inviter)
+        self.btn_run.pack(side=tk.LEFT, **pad)
+        self.btn_stop = ttk.Button(actions, text="Stop", command=self.stop_inviter, state="disabled")
+        self.btn_stop.pack(side=tk.LEFT, **pad)
+        ttk.Button(actions, text="Settings…", command=self.open_settings_dialog).pack(side=tk.LEFT, **pad)
+        ttk.Button(actions, text="Save Settings", command=self.save_settings).pack(side=tk.LEFT, **pad)
+        ttk.Button(actions, text="Open Log", command=self.open_log).pack(side=tk.LEFT, **pad)
 
-        # Row 6: Log area
-        self.txt = tk.Text(frm, height=18, wrap="word")
-        self.txt.grid(row=6, column=0, columnspan=6, sticky="nsew", padx=6, pady=6)
-        yscroll = ttk.Scrollbar(frm, orient="vertical", command=self.txt.yview)
-        yscroll.grid(row=6, column=6, sticky="ns")
-        self.txt.configure(yscrollcommand=yscroll.set)
+        # Row 5: Log frame
+        log_frame = ttk.LabelFrame(frm, text="Log")
+        log_frame.grid(row=5, column=0, columnspan=6, sticky="nsew", padx=6, pady=4)
+        self.txt = scrolledtext.ScrolledText(log_frame, height=18, wrap="word")
+        self.txt.pack(fill=tk.BOTH, expand=True, padx=6, pady=6)
+
+        # Context menu for log
+        self.txt_menu = tk.Menu(self, tearoff=False)
+        self.txt_menu.add_command(label="Copy", command=lambda: self.txt.event_generate("<<Copy>>"))
+        self.txt_menu.add_command(label="Clear", command=lambda: self.txt.delete("1.0", tk.END))
+        self.txt.bind("<Button-3>", self._show_text_menu)
 
         frm.columnconfigure(1, weight=1)
-        frm.rowconfigure(6, weight=1)
+        frm.rowconfigure(5, weight=1)
+
+        # Status bar
+        status_frame = ttk.Frame(self)
+        status_frame.pack(fill=tk.X, side=tk.BOTTOM)
+        self.progress = ttk.Progressbar(status_frame, mode="indeterminate")
+        self.progress.pack(side=tk.LEFT, padx=6, pady=2)
+        ttk.Label(status_frame, textvariable=self.status_var).pack(side=tk.LEFT, fill=tk.X, expand=True, padx=6)
 
     def open_url(self):
         url = self.var_start_url.get().strip()
@@ -345,11 +369,17 @@ class App(tk.Tk):
 
         try:
             self.proc.start(args=args, cwd=self.script_path.parent, env=env)
+            self.btn_run.config(state="disabled")
+            self.btn_stop.config(state="normal")
+            self.progress.start(10)
+            self.status_var.set("Running...")
         except Exception as e:
             messagebox.showerror("Run failed", str(e))
 
     def stop_inviter(self):
         self.proc.stop()
+        self.btn_stop.config(state="disabled")
+        self.status_var.set("Stopping...")
 
     def append_log(self, text: str):
         self.txt.insert(tk.END, text)
@@ -357,6 +387,16 @@ class App(tk.Tk):
 
     def on_proc_exit(self, code: int | None):
         self.append_log(f"\n[exit] Process ended with code {code}.\n")
+        self.btn_run.config(state="normal")
+        self.btn_stop.config(state="disabled")
+        self.progress.stop()
+        self.status_var.set(f"Exit code {code}")
+
+    def _show_text_menu(self, event):
+        try:
+            self.txt_menu.tk_popup(event.x_root, event.y_root)
+        finally:
+            self.txt_menu.grab_release()
 
     def open_settings_dialog(self):
         dlg = tk.Toplevel(self)
