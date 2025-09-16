@@ -386,6 +386,20 @@ class WidgetMixin:
         except Exception:
             pass
 
+        if action in {"invite", "favorites"}:
+            helper_label = ttk.Label(
+                self.input_frame,
+                text="Open the relevant Voices page, then click Start.",
+                anchor="center",
+                justify=tk.CENTER,
+                wraplength=360,
+            )
+            self._style_label(helper_label)
+            helper_label.pack(
+                fill=tk.X,
+                padx=self.spacing["inline"],
+                pady=(self.spacing["row"], 0),
+            )
         if action == "invite":
             pass
         elif action == "favorites":
