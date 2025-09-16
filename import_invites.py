@@ -321,7 +321,7 @@ async def main_async() -> int:
 
         for idx, username in enumerate(usernames, start=1):
             profile_url = f"https://www.voices.com/profile/{username}"
-            info(f"({idx} of {len(usernames)}) Inviting: {username}")
+            info(f"Processing talent {idx} of {len(usernames)}: {username}")
             try:
                 result = await invite_flow_for_profile(page, profile_url, job_digits)
             except Exception as e:
