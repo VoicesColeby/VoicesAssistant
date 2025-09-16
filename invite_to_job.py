@@ -1,4 +1,4 @@
-# invite_to_job.py — robust Choices.js selection (keyboard search → JS click → native fallback)
+# invite_to_job.py - robust Choices.js selection (keyboard search -> JS click -> native fallback)
 # plus slower pacing and clear logging.
 
 import asyncio
@@ -46,8 +46,12 @@ INVITE_BUTTON_WITH_DROPDOWN = "button.headbtn.btn.btn-primary:has(i.fa-caret-dow
 # The dropdown menu container near the clicked button
 DROPDOWN_MENU = ".dropdown-content, .downmenu .dropdown-content"
 
-# "Invite to Existing Job" button inside dropdown
-INVITE_EXISTING_BTN = "button.request_a_quote_btn:has-text('Invite to Existing Job')"
+# "Invite to Existing Job" button inside dropdown (robust union)
+INVITE_EXISTING_BTN = ", ".join([
+    "button.request_a_quote_btn:has-text('Invite to Existing Job')",
+    "a.request_a_quote_btn:has-text('Invite to Existing Job')",
+    "[role='menuitem']:has-text('Invite to Existing Job')",
+])
 
 # Modal selectors
 MODAL_VISIBLE = ".modal.show, .modal.fade.show, .modal:visible"
@@ -58,7 +62,8 @@ CHOICES_CONTAINER = ".choices[data-type='select-one']"
 CHOICES_INNER     = ".choices__inner"
 CHOICES_INPUT     = ".choices__input--cloned"  # the hidden text input for type-to-search
 CHOICES_DROPDOWN  = ".choices__list--dropdown"
-CHOICES_ITEMS     = ".choices__list--dropdown .choices__item--choice"
+# Options within the open dropdown (support both standard and generic item classes)
+CHOICES_ITEMS     = ".choices__list--dropdown .choices__item--choice, .choices__list--dropdown .choices__item"
 CHOICES_SINGLE    = ".choices__list--single .choices__item"
 
 # Native select
@@ -80,6 +85,16 @@ NEXT_PAGE_SELECTOR = """
 """
 
 """Logging provided by common_logging"""
+
+# =======================
+# Additional selectors (profile page)
+# =======================
+# Fallback Invite button on talent profile pages (no explicit caret selector)
+PROFILE_INVITE_BTN = ", ".join([
+    "button:has-text('Invite to Job')",
+    "a.btn.btn-primary:has-text('Invite to Job')",
+    "[role='button']:has-text('Invite to Job')",
+])
 
 # ============== Humanization (live speed support) ==============
 def _read_speed_file() -> float:
@@ -217,16 +232,29 @@ async def invite_single_talent(page: Page, invite_btn: Locator) -> str:
     await asyncio.sleep(OPEN_DROPDOWN_MS/1000)
 
     info("Waiting for and clicking 'Invite to Existing Job'...")
+    clicked_existing = False
     try:
         parent_downmenu = invite_btn.locator("..")
         dropdown_menu = parent_downmenu.locator(DROPDOWN_MENU)
         await dropdown_menu.wait_for(state="visible", timeout=5000)
         existing_btn = dropdown_menu.locator(INVITE_EXISTING_BTN)
-        if not await safe_click(existing_btn, timeout=5000):
-            warn("Could not click 'Invite to Existing Job'")
-            return 'skipped'
+        if await existing_btn.count() > 0:
+            clicked_existing = await safe_click(existing_btn.first, timeout=5000)
     except PWTimeout:
-        warn("Dropdown menu didn't appear in time.")
+        warn("Dropdown menu didn't appear in time (scoped). Trying global fallback...")
+        clicked_existing = False
+
+    if not clicked_existing:
+        try:
+            # Global fallback: menu may be rendered elsewhere in DOM
+            existing_global = page.locator(INVITE_EXISTING_BTN).first
+            await existing_global.wait_for(state="visible", timeout=5000)
+            clicked_existing = await safe_click(existing_global, timeout=5000)
+        except Exception as e:
+            warn(f"Global fallback failed for 'Invite to Existing Job': {str(e)[:140]}")
+
+    if not clicked_existing:
+        warn("Could not click 'Invite to Existing Job'")
         return 'skipped'
 
     await asyncio.sleep(OPEN_MODAL_MS/1000)
@@ -235,12 +263,14 @@ async def invite_single_talent(page: Page, invite_btn: Locator) -> str:
     try:
         await page.wait_for_selector(MODAL_VISIBLE, state="visible", timeout=8000)
         info("Modal opened successfully")
+        info("[invite] modal:ready")
     except PWTimeout:
         warn("Modal didn't appear")
         return 'skipped'
 
     await step_pause()
 
+    # In regular flow, rely on the existing/default job selection in modal
     success = await ensure_job_selected(page)
     if not success:
         warn("Failed to select job")
@@ -248,9 +278,10 @@ async def invite_single_talent(page: Page, invite_btn: Locator) -> str:
         return 'skipped'
     await step_pause()
 
-    info("Clicking final submit button (slow)…")
+    info("Clicking final submit button (slow)...")
     submit_btn = page.locator(MODAL_SUBMIT_BTN).first
     await asyncio.sleep(BEFORE_SUBMIT_MS/1000)
+    info("[invite] submit:clicked")
     if not await safe_click(submit_btn, timeout=8000):
         warn("Could not click submit button")
         await close_modal(page)
@@ -258,11 +289,17 @@ async def invite_single_talent(page: Page, invite_btn: Locator) -> str:
 
     await asyncio.sleep(1.2)
     result = await check_invitation_result(page)
+    if result == 'success':
+        info("[invite] done:success")
+    elif result == 'already':
+        info("[invite] done:already")
+    else:
+        info("[invite] done:failed")
     await close_modal(page)
     return result
 
 async def select_job_in_modal(page: Page, job_query: str) -> bool:
-    """Robust: keyboard → normal click → JS click → native fallback. Verifies after each."""
+    """Robust: keyboard -> normal click -> JS click -> native fallback. Verifies after each."""
     info(f"Selecting job: {job_query}")
     m = re.search(r"\d+", job_query)
     job_id = m.group(0) if m else None
@@ -285,7 +322,7 @@ async def select_job_in_modal(page: Page, job_query: str) -> bool:
         try:
             await modal.locator(f"{CHOICES_DROPDOWN}[aria-expanded='true']").wait_for(state="visible", timeout=6000)
         except PWTimeout:
-            warn("Dropdown did not open (aria-expanded!='true'). Capturing screenshot…")
+            warn("Dropdown did not open (aria-expanded!='true'). Capturing screenshot...")
             os.makedirs("logs", exist_ok=True)
             try:
                 await page.screenshot(path="logs/dropdown_not_open.png")
@@ -311,7 +348,7 @@ async def select_job_in_modal(page: Page, job_query: str) -> bool:
                 if await input_loc.count() > 0:
                     await input_loc.fill("")  # clear
                     await asyncio.sleep(0.1)
-                    # Type the id (not including '#') — Choices filters live
+                    # Type the id (not including '#') - Choices filters live
                     await input_loc.type(job_id, delay=50)
                     await asyncio.sleep(0.6)
                     # Press Enter to select highlighted option
@@ -321,7 +358,7 @@ async def select_job_in_modal(page: Page, job_query: str) -> bool:
                         ok(f"Selected job via keyboard: {job_id}")
                         return True
                     else:
-                        warn("Keyboard selection didn't verify; trying click paths…")
+                        warn("Keyboard selection didn't verify; trying click paths...")
         except Exception as e:
             warn(f"Keyboard path error: {str(e)[:140]}")
 
@@ -337,7 +374,7 @@ async def select_job_in_modal(page: Page, job_query: str) -> bool:
                     if await verify_selected(page, job_id):
                         ok(f"Selected job by ID (click): {job_id}")
                         return True
-                    warn("Normal click didn't verify; trying JS click…")
+                    warn("Normal click didn't verify; trying JS click...")
         except Exception as e:
             warn(f"Normal click error: {str(e)[:140]}")
 
@@ -348,7 +385,7 @@ async def select_job_in_modal(page: Page, job_query: str) -> bool:
                 if await verify_selected(page, job_id):
                     ok(f"Selected job by ID (JS click): {job_id}")
                     return True
-                warn("JS click didn't verify; trying native…")
+                warn("JS click didn't verify; trying native...")
         except Exception as e:
             warn(f"JS click error: {str(e)[:140]}")
 
@@ -358,7 +395,7 @@ async def select_job_in_modal(page: Page, job_query: str) -> bool:
     # 4) NATIVE SELECT FALLBACK
     try:
         if job_id:
-            info("Trying native select fallback…")
+            info("Trying native select fallback...")
             if await force_native_value(page, job_id):
                 await asyncio.sleep(0.6)
                 if await verify_selected(page, job_id):
@@ -383,7 +420,7 @@ async def select_job_in_modal(page: Page, job_query: str) -> bool:
     except Exception:
         native = None
     warn(
-        f"Failed to select job (id={job_id}, query='{job_query}') — native='{native}', single='{single}'"
+        f"Failed to select job (id={job_id}, query='{job_query}') - native='{native}', single='{single}'"
     )
     if os.getenv("DEBUG_CHOICES"):
         try:
@@ -466,6 +503,22 @@ async def process_current_page(page: Page, skip_first: bool = False) -> Dict[str
     invite_buttons = page.locator(INVITE_BUTTON_WITH_DROPDOWN)
     count = await invite_buttons.count()
     if count == 0:
+        # Fallback: talent profile page button without explicit caret selector
+        profile_btns = page.locator(PROFILE_INVITE_BTN)
+        pcount = await profile_btns.count()
+        if pcount > 0:
+            info("Profile page detected (fallback). Attempting invite...")
+            stats["seen"] = 1
+            result = await invite_single_talent(page, profile_btns.first)
+            if result == 'success':
+                stats["invited"] = 1
+            elif result == 'already':
+                stats["already"] = 1
+            elif result == 'skipped':
+                stats["skipped"] = 1
+            else:
+                stats["failed"] = 1
+            return stats
         warn("No invite buttons found on this page")
         return stats
     stats["seen"] = count
